@@ -352,7 +352,8 @@ create policy settings_write on public.app_settings for all to authenticated
 
 insert into public.app_settings (key, value) values
   ('slow_reply_min', '10'),
-  ('company_name', '"TESR"')
+  ('company_name', '"TESR"'),
+  ('quick_replies', '["ขอบคุณครับผม","สวัสดีครับ","Location: www.tesrshop.com/map_playground","รับทราบครับ รอสักครู่นะครับ"]')
 on conflict do nothing;
 
 -- ---------- จัดการพนักงาน (admin) ----------
@@ -394,3 +395,72 @@ grant  execute on function public.staff_stats(timestamptz, timestamptz) to authe
 alter table public.staff add column if not exists position text;
 alter table public.staff add column if not exists phone text;
 grant update (display_name, role, active, position, phone) on public.staff to authenticated;
+
+-- =====================================================================
+-- รหัสผ่านเริ่มต้น (แอดมินดูได้) + การแจ้งเตือน (Web Push)
+-- =====================================================================
+
+-- ---------- รหัสผ่านเริ่มต้นที่แอดมินตั้งให้ ----------
+-- เก็บเฉพาะ "รหัสชั่วคราว" ที่แอดมินตั้ง และลบทิ้งทันทีเมื่อพนักงานเปลี่ยนรหัสเอง
+-- (รหัสที่พนักงานตั้งเองจะไม่ถูกเก็บ และไม่มีใครดูได้)
+create table if not exists public.staff_initial_pw (
+  staff_id   uuid primary key references public.staff(id) on delete cascade,
+  password   text not null,
+  set_by     uuid references public.staff(id) on delete set null,
+  set_at     timestamptz not null default now()
+);
+alter table public.staff_initial_pw enable row level security;
+revoke all on public.staff_initial_pw from anon, authenticated;
+
+create or replace function public.admin_get_initial_passwords()
+returns table (staff_id uuid, password text, set_at timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not is_admin() then raise exception 'admin only'; end if;
+  return query select p.staff_id, p.password, p.set_at from staff_initial_pw p;
+end $$;
+
+-- เรียกหลังพนักงานเปลี่ยนรหัสผ่านเอง
+create or replace function public.clear_my_initial_password() returns void
+language sql security definer set search_path = public as $$
+  delete from staff_initial_pw where staff_id = auth.uid();
+$$;
+
+revoke execute on function public.admin_get_initial_passwords() from public, anon;
+revoke execute on function public.clear_my_initial_password()   from public, anon;
+grant  execute on function public.admin_get_initial_passwords() to authenticated;
+grant  execute on function public.clear_my_initial_password()   to authenticated;
+
+-- ---------- ค่าลับของระบบ (อ่านได้เฉพาะ Edge Function) ----------
+create table if not exists public.app_secrets (
+  key    text primary key,
+  value  text not null
+);
+alter table public.app_secrets enable row level security;
+revoke all on public.app_secrets from anon, authenticated;
+
+-- ---------- อุปกรณ์ที่รับแจ้งเตือน (Web Push) ----------
+create table if not exists public.push_subscriptions (
+  id          bigint generated always as identity primary key,
+  staff_id    uuid not null references public.staff(id) on delete cascade,
+  endpoint    text not null unique,
+  p256dh      text not null,
+  auth        text not null,
+  user_agent  text,
+  created_at  timestamptz not null default now()
+);
+alter table public.push_subscriptions enable row level security;
+drop policy if exists push_own_select on public.push_subscriptions;
+drop policy if exists push_own_insert on public.push_subscriptions;
+drop policy if exists push_own_update on public.push_subscriptions;
+drop policy if exists push_own_delete on public.push_subscriptions;
+create policy push_own_select on public.push_subscriptions for select to authenticated using (staff_id = auth.uid());
+create policy push_own_insert on public.push_subscriptions for insert to authenticated
+  with check (staff_id = auth.uid() and public.is_staff());
+create policy push_own_update on public.push_subscriptions for update to authenticated
+  using (staff_id = auth.uid()) with check (staff_id = auth.uid());
+create policy push_own_delete on public.push_subscriptions for delete to authenticated using (staff_id = auth.uid());
+-- กุญแจ VAPID สำหรับ Web Push: สร้างด้วย `npx web-push generate-vapid-keys` แล้วรัน
+--   insert into public.app_secrets values ('vapid_public_key','<public>'), ('vapid_private_key','<private>'),
+--     ('vapid_subject','mailto:<อีเมลแอดมิน>') on conflict (key) do update set value = excluded.value;
+--   insert into public.app_settings (key, value) values ('vapid_public_key', '"<public>"') on conflict (key) do update set value = excluded.value;
