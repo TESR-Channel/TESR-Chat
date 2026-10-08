@@ -1,0 +1,1060 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TESR Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#fff; --ink:#16181d; --muted:#6b7280; --line:#e5e7eb;
+  --brand:#e5322d; --brand-ink:#fff; --bubble-in:#fff; --bubble-out:#16181d; --bubble-out-ink:#fff;
+  --warn:#d97706; --bad:#dc2626; --ok:#16a34a; --sel:#fff1f0;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1115; --panel:#171a20; --ink:#e8eaee; --muted:#9aa1ad; --line:#272b33;
+  --bubble-in:#22262e; --bubble-out:#e5322d; --bubble-out-ink:#fff; --sel:#2a1716;
+}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans Thai",system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+
+/* login */
+#login{min-height:100%;display:grid;place-items:center;padding:16px}
+#login form{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;width:min(360px,100%);display:grid;gap:12px}
+#login h1{margin:0 0 4px;font-size:22px}
+#login h1 b{color:var(--brand)}
+.inp{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.btn{padding:10px 14px;border:0;border-radius:10px;background:var(--brand);color:var(--brand-ink);font-weight:600}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:500}
+.err{color:var(--bad);font-size:13px;min-height:1em}
+
+/* app shell */
+#app{height:100%;display:grid;grid-template-rows:52px 1fr}
+header{display:flex;align-items:center;gap:12px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+header .logo{font-weight:700;font-size:17px}
+header .logo b{color:var(--brand)}
+header nav{display:flex;gap:4px;margin-left:12px}
+header nav button{background:none;border:0;padding:6px 12px;border-radius:8px;color:var(--muted);font-weight:500}
+header nav button.on{background:var(--bg);color:var(--ink)}
+header .me{margin-left:auto;display:flex;gap:10px;align-items:center;color:var(--muted);font-size:13px}
+
+.inbox{display:grid;grid-template-columns:320px 1fr 300px;min-height:0}
+.col{min-height:0;display:flex;flex-direction:column;background:var(--panel)}
+.col+.col{border-left:1px solid var(--line)}
+
+/* list */
+.filters{padding:10px;display:grid;gap:8px;border-bottom:1px solid var(--line)}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px;font-size:13px;white-space:nowrap}
+.chip.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.row2 select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:13px}
+#list{overflow-y:auto;flex:1}
+.item{display:grid;grid-template-columns:42px 1fr auto;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.item:hover{background:var(--bg)}
+.item.on{background:var(--sel)}
+.ava{width:42px;height:42px;border-radius:50%;background:var(--line);object-fit:cover;position:relative}
+.avawrap{position:relative}
+.badge{position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:50%;border:2px solid var(--panel);display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff}
+.item .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .lt{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .meta{text-align:right;font-size:12px;color:var(--muted);display:grid;gap:4px;justify-items:end}
+.unread{background:var(--brand);color:#fff;border-radius:999px;padding:0 7px;font-size:11px;font-weight:700}
+.wait{font-size:11px;font-weight:600}
+.wait.warn{color:var(--warn)} .wait.bad{color:var(--bad)}
+.tag{display:inline-block;font-size:11px;padding:0 6px;border-radius:6px;background:var(--bg);color:var(--muted)}
+
+/* chat */
+.chathead{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);min-height:62px}
+.chathead .nm{font-weight:600}
+.chathead .sub{font-size:12px;color:var(--muted)}
+.back{display:none;background:none;border:0;font-size:20px;padding:0 6px}
+#msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:6px;background:var(--bg)}
+.day{align-self:center;font-size:12px;color:var(--muted);margin:10px 0 4px}
+.msg{max-width:min(520px,78%);display:grid;gap:2px}
+.msg.in{align-self:flex-start}
+.msg.out{align-self:flex-end;justify-items:end}
+.bub{padding:8px 12px;border-radius:14px;white-space:pre-wrap;word-break:break-word}
+.in .bub{background:var(--bubble-in);border:1px solid var(--line);border-top-left-radius:4px}
+.out .bub{background:var(--bubble-out);color:var(--bubble-out-ink);border-top-right-radius:4px}
+.out.failed .bub{background:transparent;color:var(--bad);border:1px dashed var(--bad)}
+.bub a{color:inherit}
+.bub img.media{max-width:260px;max-height:260px;border-radius:10px;display:block}
+.bub video,.bub audio{max-width:260px;display:block}
+.bub img.sticker{width:110px}
+.mt{font-size:11px;color:var(--muted)}
+.mt .slow{color:var(--bad);font-weight:600}
+.empty{margin:auto;color:var(--muted);text-align:center}
+.composer{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line);align-items:flex-end}
+.composer textarea{flex:1;resize:none;max-height:140px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.iconbtn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-size:18px;display:grid;place-items:center}
+.attach{padding:6px 12px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
+
+/* info */
+.info{overflow-y:auto;padding:14px;display:grid;gap:14px;align-content:start}
+.info h3{margin:0;font-size:13px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.field{display:grid;gap:4px}
+.field label{font-size:12px;color:var(--muted)}
+.field select{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.note{background:var(--bg);border-radius:10px;padding:8px 10px;font-size:14px;white-space:pre-wrap}
+.note .by{font-size:11px;color:var(--muted);margin-top:4px}
+#noteText{width:100%;min-height:60px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);resize:vertical}
+.log{font-size:12px;color:var(--muted)}
+
+/* dashboard */
+.dash{overflow-y:auto;padding:20px;display:grid;gap:18px;align-content:start;max-width:1100px;width:100%;margin:0 auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card .k{font-size:12px;color:var(--muted)}
+.card .v{font-size:26px;font-weight:700;margin-top:2px}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);font-size:14px}
+th{font-size:12px;color:var(--muted);font-weight:600;background:var(--bg)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+/* settings */
+.chcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.chcard>summary{list-style:none;display:flex;gap:12px;align-items:center;padding:14px 16px;cursor:pointer}
+.chcard>summary::-webkit-details-marker{display:none}
+.chdot{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;flex:none}
+.pill{font-size:12px;padding:2px 9px;border-radius:999px;background:var(--bg);color:var(--muted);white-space:nowrap}
+.pill.ok{background:#dcfce7;color:#166534} .pill.bad{background:#fee2e2;color:#991b1b} .pill.soon{background:#fef3c7;color:#92400e}
+@media (prefers-color-scheme:dark){.pill.ok{background:#14532d;color:#bbf7d0}.pill.bad{background:#7f1d1d;color:#fecaca}.pill.soon{background:#78350f;color:#fde68a}}
+.chbody{padding:0 16px 16px;display:grid;gap:14px;border-top:1px solid var(--line)}
+.steps{margin:12px 0 0;padding-left:20px;display:grid;gap:6px;font-size:14px}
+.steps code,.copybox code{background:var(--bg);padding:1px 6px;border-radius:5px;font-size:13px;word-break:break-all}
+.copybox{display:flex;gap:8px;align-items:center;background:var(--bg);border-radius:10px;padding:8px 10px;font-size:13px}
+.copybox code{flex:1;background:none;padding:0}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.fgrid .field input{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);width:100%}
+.hint{font-size:12px;color:var(--muted)}
+.switch{display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer}
+.switch input{width:18px;height:18px;accent-color:var(--brand)}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.warnbox{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 12px;font-size:13px}
+@media (prefers-color-scheme:dark){.warnbox{background:#2a2110;border-color:#78350f;color:#fde68a}}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-size:14px;z-index:50}
+
+/* mobile */
+@media (max-width:1000px){
+  .inbox{grid-template-columns:300px 1fr}
+  #infoCol{position:fixed;inset:52px 0 0 auto;width:min(320px,90vw);z-index:20;border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(0,0,0,.15)}
+  #infoCol.closed{display:none}
+}
+@media (max-width:700px){
+  header nav{margin-left:4px} header .me span{display:none}
+  .inbox{grid-template-columns:1fr}
+  .inbox.chatting #listCol{display:none}
+  .inbox:not(.chatting) #chatCol{display:none}
+  .back{display:block}
+  .dash{padding:16px}
+}
+</style>
+</head>
+<body>
+
+<!-- ========== LOGIN ========== -->
+<section id="login" class="hidden">
+  <form id="loginForm">
+    <h1><b>TESR</b> Chat</h1>
+    <div style="color:var(--muted);font-size:13px;margin-bottom:6px">รวมแชตทุกช่องทาง สำหรับทีม TESR</div>
+    <input class="inp" type="email" id="email" placeholder="อีเมล" required autocomplete="username">
+    <input class="inp" type="password" id="pass" placeholder="รหัสผ่าน" required autocomplete="current-password">
+    <button class="btn" type="submit">เข้าสู่ระบบ</button>
+    <div class="err" id="loginErr"></div>
+  </form>
+</section>
+
+<!-- ========== APP ========== -->
+<section id="app" class="hidden">
+  <header>
+    <div class="logo"><b>TESR</b> Chat</div>
+    <nav>
+      <button data-view="inbox" class="on">กล่องแชต</button>
+      <button data-view="dash">สถิติทีม</button>
+      <button data-view="settings" id="navSettings" class="hidden">⚙ ตั้งค่า</button>
+    </nav>
+    <div class="me"><span id="meName"></span><button class="btn ghost" id="logout" style="padding:5px 10px">ออก</button></div>
+  </header>
+
+  <!-- inbox -->
+  <main class="inbox" id="inboxView">
+    <div class="col" id="listCol">
+      <div class="filters">
+        <input class="inp" id="q" placeholder="ค้นหาชื่อลูกค้า / ข้อความ" style="padding:8px 10px">
+        <div class="chips" id="chanChips"></div>
+        <div class="row2">
+          <select id="fUnit"><option value="">ทุกฝ่าย</option></select>
+          <select id="fState">
+            <option value="">ทุกสถานะ</option>
+            <option value="waiting">⏳ รอตอบ</option>
+            <option value="mine">👤 ของฉัน</option>
+            <option value="unassigned">ยังไม่มีผู้ดูแล</option>
+            <option value="open">เปิดอยู่</option>
+            <option value="closed">ปิดแล้ว</option>
+          </select>
+        </div>
+      </div>
+      <div id="list"></div>
+    </div>
+
+    <div class="col" id="chatCol">
+      <div class="chathead" id="chatHead">
+        <button class="back" id="backBtn" aria-label="กลับ">‹</button>
+        <div class="empty" style="margin:0">เลือกแชตทางซ้าย</div>
+      </div>
+      <div id="msgs"><div class="empty">ยังไม่ได้เลือกลูกค้า</div></div>
+      <div class="attach hidden" id="attachBar"></div>
+      <form class="composer" id="composer">
+        <input type="file" id="file" hidden>
+        <button type="button" class="iconbtn" id="attachBtn" title="แนบรูป/ไฟล์">📎</button>
+        <textarea id="text" rows="1" placeholder="พิมพ์ข้อความ… (Enter ส่ง, Shift+Enter ขึ้นบรรทัด)"></textarea>
+        <button class="btn" id="sendBtn" type="submit">ส่ง</button>
+      </form>
+    </div>
+
+    <aside class="col info closed" id="infoCol"></aside>
+  </main>
+
+  <!-- dashboard -->
+  <main class="dash hidden" id="dashView">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <h2 style="margin:0;font-size:20px">สถิติการตอบแชต</h2>
+      <div class="chips" id="rangeChips" style="margin-left:auto"></div>
+    </div>
+    <div class="cards" id="kpis"></div>
+    <div>
+      <h3 style="font-size:14px;margin:0 0 8px">รายบุคคล</h3>
+      <div style="overflow-x:auto"><table id="staffTbl"></table></div>
+    </div>
+    <div>
+      <h3 style="font-size:14px;margin:0 0 8px">แยกตามช่องทาง</h3>
+      <div style="overflow-x:auto"><table id="chanTbl"></table></div>
+    </div>
+    <div><button class="btn ghost" id="exportBtn">⬇ Export แชตช่วงนี้เป็น CSV</button></div>
+  </main>
+
+  <!-- settings (admin) -->
+  <main class="dash hidden" id="settingsView">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <h2 style="margin:0;font-size:20px">ตั้งค่าระบบ</h2>
+      <div class="chips" id="setTabs" style="margin-left:auto">
+        <button class="chip on" data-t="channels">ช่องทาง</button>
+        <button class="chip" data-t="staff">พนักงาน</button>
+        <button class="chip" data-t="general">ทั่วไป</button>
+      </div>
+    </div>
+    <div id="setBody"></div>
+  </main>
+</section>
+
+<script>
+// ===================================================================
+// CONFIG & CONSTANTS
+// ===================================================================
+const CFG = window.TESR_CONFIG;
+const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+let SLOW = (CFG.SLOW_REPLY_MIN || 10) * 60; // ถูกแทนด้วยค่าจาก ตั้งค่า > ทั่วไป
+
+const CH = {
+  line:      { name:"LINE",      color:"#06C755", s:"L" },
+  facebook:  { name:"Facebook",  color:"#1877F2", s:"f" },
+  instagram: { name:"Instagram", color:"#E4405F", s:"IG" },
+  tiktok:    { name:"TikTok",    color:"#111111", s:"T" },
+  youtube:   { name:"YouTube",   color:"#FF0000", s:"▶" },
+  shopee:    { name:"Shopee",    color:"#EE4D2D", s:"S" },
+  lazada:    { name:"Lazada",    color:"#0F146D", s:"Lz" },
+};
+const UNITS = { shop:"TESR Shop", academy:"TESR Academy", rnd:"TESR R&D", logistics:"TESR Logistics", other:"อื่น ๆ" };
+
+const S = { me:null, staff:{}, contacts:[], current:null, chan:"", pending:null, range:"today" };
+
+// ===================================================================
+// HELPERS
+// ===================================================================
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const safeUrl = (u) => /^https?:\/\//i.test(u || "") ? esc(u) : "#";
+const linkify = (t) => esc(t).replace(/https?:\/\/[^\s<]+/g, u => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
+const pad = (n) => String(n).padStart(2, "0");
+const hhmm = (d) => { d = new Date(d); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const dayLabel = (d) => {
+  d = new Date(d); const t = new Date(); const y = new Date(Date.now() - 864e5);
+  if (d.toDateString() === t.toDateString()) return "วันนี้";
+  if (d.toDateString() === y.toDateString()) return "เมื่อวาน";
+  return d.toLocaleDateString("th-TH", { day:"numeric", month:"short", year:"numeric" });
+};
+const shortTime = (d) => {
+  d = new Date(d);
+  return d.toDateString() === new Date().toDateString() ? hhmm(d)
+       : d.toLocaleDateString("th-TH", { day:"numeric", month:"short" });
+};
+const dur = (sec) => {
+  if (sec == null) return "–";
+  sec = Math.round(sec);
+  if (sec < 60) return `${sec} วิ`;
+  if (sec < 3600) return `${Math.floor(sec/60)} นาที`;
+  if (sec < 86400) return `${Math.floor(sec/3600)} ชม. ${Math.floor(sec%3600/60)} น.`;
+  return `${Math.floor(sec/86400)} วัน`;
+};
+function toast(msg) {
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 3200);
+}
+function avatar(c) {
+  const ch = CH[c.channel] || { color:"#888", s:"?" };
+  const img = c.avatar_url
+    ? `<img class="ava" src="${safeUrl(c.avatar_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+    : `<div class="ava" style="display:grid;place-items:center;font-weight:700;color:var(--muted)">${esc((c.display_name||"?").slice(0,1))}</div>`;
+  return `<div class="avawrap">${img}<span class="badge" style="background:${ch.color}" title="${ch.name}">${ch.s}</span></div>`;
+}
+
+// ===================================================================
+// AUTH
+// ===================================================================
+$("loginForm").onsubmit = async (e) => {
+  e.preventDefault(); $("loginErr").textContent = "";
+  const { error } = await sb.auth.signInWithPassword({ email:$("email").value, password:$("pass").value });
+  if (error) $("loginErr").textContent = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
+};
+$("logout").onclick = () => sb.auth.signOut();
+
+sb.auth.onAuthStateChange((_ev, session) => { session ? boot(session.user) : showLogin(); });
+
+function showLogin() { $("app").classList.add("hidden"); $("login").classList.remove("hidden"); }
+
+let booted = false;
+async function boot(user) {
+  if (booted && S.me?.id === user.id) return;
+  booted = true;
+  const { data: me, error } = await sb.from("staff").select("*").eq("id", user.id).single();
+  if (error || !me?.active) {
+    await sb.auth.signOut();
+    $("loginErr").textContent = "บัญชีนี้ยังไม่ได้รับสิทธิ์ใช้งาน (ติดต่อแอดมิน)";
+    return;
+  }
+  S.me = me;
+  $("navSettings").classList.toggle("hidden", me.role !== "admin");
+  const { data: st } = await sb.from("app_settings").select("key,value");
+  S.settings = Object.fromEntries((st || []).map(r => [r.key, r.value]));
+  if (S.settings.slow_reply_min) SLOW = Number(S.settings.slow_reply_min) * 60;
+  $("meName").textContent = me.display_name;
+  $("login").classList.add("hidden"); $("app").classList.remove("hidden");
+  await loadStaff();
+  buildFilters();
+  await loadContacts();
+  if (!S.live) { S.live = true; subscribe(); setInterval(renderList, 30000); } // อัปเดตตัวนับเวลารอตอบ
+}
+
+async function loadStaff() {
+  const { data } = await sb.from("staff").select("id,display_name,active").order("display_name");
+  S.staff = Object.fromEntries((data || []).map(s => [s.id, s]));
+}
+
+// ===================================================================
+// CONTACT LIST
+// ===================================================================
+function buildFilters() {
+  const chips = [["", "ทั้งหมด"], ...Object.entries(CH).map(([k, v]) => [k, v.name])];
+  $("chanChips").innerHTML = chips.map(([k, n]) =>
+    `<button class="chip${k === S.chan ? " on" : ""}" data-ch="${k}">${n}</button>`).join("");
+  $("chanChips").onclick = (e) => {
+    const b = e.target.closest("[data-ch]"); if (!b) return;
+    S.chan = b.dataset.ch; buildFilters(); renderList();
+  };
+  if ($("fUnit").options.length === 1)
+    $("fUnit").innerHTML += Object.entries(UNITS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+}
+["q", "fUnit", "fState"].forEach(id => $(id).addEventListener("input", renderList));
+
+async function loadContacts() {
+  const { data, error } = await sb.from("contacts").select("*")
+    .order("last_message_at", { ascending:false }).limit(500);
+  if (error) return toast("โหลดรายชื่อไม่สำเร็จ: " + error.message);
+  S.contacts = data || [];
+  renderList();
+}
+
+function filtered() {
+  const q = $("q").value.trim().toLowerCase(), unit = $("fUnit").value, st = $("fState").value;
+  return S.contacts.filter(c => {
+    if (S.chan && c.channel !== S.chan) return false;
+    if (unit && c.business_unit !== unit) return false;
+    if (st === "waiting" && !c.awaiting_since) return false;
+    if (st === "mine" && c.assigned_to !== S.me.id) return false;
+    if (st === "unassigned" && c.assigned_to) return false;
+    if ((st === "open" || st === "closed") && c.status !== st) return false;
+    if (q && !`${c.display_name} ${c.last_text}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+function renderList() {
+  const list = filtered();
+  if (!list.length) { $("list").innerHTML = `<div class="empty" style="padding:30px">ไม่มีแชต</div>`; return; }
+  $("list").innerHTML = list.map(c => {
+    let wait = "";
+    if (c.awaiting_since) {
+      const s = (Date.now() - new Date(c.awaiting_since)) / 1000;
+      wait = `<span class="wait ${s > SLOW ? "bad" : s > SLOW/2 ? "warn" : ""}">⏳ ${dur(s)}</span>`;
+    }
+    const tags = [
+      c.business_unit ? `<span class="tag">${esc(UNITS[c.business_unit])}</span>` : "",
+      c.assigned_to ? `<span class="tag">👤 ${esc(S.staff[c.assigned_to]?.display_name || "?")}</span>` : "",
+    ].join(" ");
+    return `<div class="item${S.current?.id === c.id ? " on" : ""}" data-id="${c.id}">
+      ${avatar(c)}
+      <div style="min-width:0">
+        <div class="nm">${esc(c.display_name)}</div>
+        <div class="lt">${esc(c.last_text)}</div>
+        <div style="margin-top:3px">${tags}</div>
+      </div>
+      <div class="meta"><span>${shortTime(c.last_message_at)}</span>
+        ${c.unread ? `<span class="unread">${c.unread}</span>` : ""}${wait}</div>
+    </div>`;
+  }).join("");
+}
+$("list").onclick = (e) => { const it = e.target.closest(".item"); if (it) openChat(it.dataset.id); };
+
+// ===================================================================
+// CHAT
+// ===================================================================
+async function openChat(id) {
+  const c = S.contacts.find(x => x.id === id); if (!c) return;
+  S.current = c; S.msgs = null; clearAttach();
+  $("inboxView").classList.add("chatting");
+  renderHead(); renderList();
+  $("msgs").innerHTML = `<div class="empty">กำลังโหลด…</div>`;
+  const { data } = await sb.from("messages").select("*").eq("contact_id", id)
+    .order("created_at", { ascending:true }).limit(1000);
+  if (S.current?.id !== id) return;
+  S.msgs = data || [];
+  renderMsgs();
+  renderInfo();
+  if (c.unread) await sb.from("contacts").update({ unread:0 }).eq("id", id);
+}
+
+function renderHead() {
+  const c = S.current, ch = CH[c.channel];
+  $("chatHead").innerHTML = `
+    <button class="back" id="backBtn2" aria-label="กลับ">‹</button>
+    ${avatar(c)}
+    <div style="min-width:0;flex:1">
+      <div class="nm">${esc(c.display_name)}</div>
+      <div class="sub"><span style="color:${ch.color};font-weight:600">● ${ch.name}</span>
+        ${c.business_unit ? " · " + esc(UNITS[c.business_unit]) : ""}
+        ${c.assigned_to ? " · ผู้ดูแล: " + esc(S.staff[c.assigned_to]?.display_name || "") : ""}</div>
+    </div>
+    <button class="iconbtn" id="infoBtn" title="ข้อมูลลูกค้า / โน้ต">ℹ︎</button>`;
+  $("backBtn2").onclick = () => { $("inboxView").classList.remove("chatting"); S.current = null; renderList(); };
+  $("infoBtn").onclick = () => $("infoCol").classList.toggle("closed");
+}
+
+function mediaHtml(m) {
+  const u = safeUrl(m.media_url);
+  switch (m.msg_type) {
+    case "image":   return `<a href="${u}" target="_blank" rel="noopener"><img class="media" src="${u}" alt="รูป" loading="lazy"></a>`;
+    case "sticker": return `<img class="sticker" src="${u}" alt="สติกเกอร์" loading="lazy">`;
+    case "video":   return `<video src="${u}" controls preload="metadata"></video>`;
+    case "audio":   return `<audio src="${u}" controls preload="none"></audio>`;
+    case "location":return `📍 <a href="${u}" target="_blank" rel="noopener">เปิดแผนที่</a>`;
+    default:        return `📎 <a href="${u}" target="_blank" rel="noopener" download>${esc(m.file_name || "ดาวน์โหลดไฟล์")}</a>`;
+  }
+}
+
+function renderMsgs() {
+  if (!S.msgs.length) { $("msgs").innerHTML = `<div class="empty">ยังไม่มีข้อความ</div>`; return; }
+  let html = "", lastDay = "";
+  for (const m of S.msgs) {
+    const d = dayLabel(m.created_at);
+    if (d !== lastDay) { html += `<div class="day">${d}</div>`; lastDay = d; }
+    // ไฟล์ขาเข้าจาก LINE: text = ชื่อไฟล์ จึงไม่แสดงซ้ำ
+    const showText = m.text && !(m.direction === "in" && m.msg_type === "file");
+    const body = (m.media_url ? mediaHtml(m) : "") + (showText ? `<div>${linkify(m.text)}</div>` : "");
+    let meta = hhmm(m.created_at);
+    if (m.direction === "out") {
+      meta += ` · ${esc(S.staff[m.sent_by]?.display_name || "ระบบ")}`;
+      if (m.response_seconds != null)
+        meta += ` · <span class="${m.response_seconds > SLOW ? "slow" : ""}">ตอบใน ${dur(m.response_seconds)}</span>`;
+      if (m.send_status === "failed") meta += ` · <span class="slow" title="${esc(m.send_error)}">ส่งไม่สำเร็จ</span>`;
+    }
+    html += `<div class="msg ${m.direction}${m.send_status === "failed" ? " failed" : ""}">
+      <div class="bub">${body || "<i>(ว่าง)</i>"}</div><div class="mt">${meta}</div></div>`;
+  }
+  $("msgs").innerHTML = html;
+  $("msgs").scrollTop = $("msgs").scrollHeight;
+}
+
+// ---------- composer ----------
+const ta = $("text");
+ta.addEventListener("input", () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 140) + "px"; });
+ta.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("composer").requestSubmit(); }
+});
+$("attachBtn").onclick = () => $("file").click();
+$("file").onchange = () => {
+  const f = $("file").files[0]; if (!f) return;
+  if (f.size > 50 * 1024 * 1024) { toast("ไฟล์ใหญ่เกิน 50 MB"); return clearAttach(); }
+  S.pending = f;
+  $("attachBar").innerHTML = `📎 ${esc(f.name)} (${(f.size/1024/1024).toFixed(1)} MB) <button class="btn ghost" style="padding:2px 8px;margin-left:8px" id="rmAttach">ลบ</button>`;
+  $("attachBar").classList.remove("hidden");
+  $("rmAttach").onclick = clearAttach;
+};
+function clearAttach() { S.pending = null; $("file").value = ""; $("attachBar").classList.add("hidden"); }
+
+$("composer").onsubmit = async (e) => {
+  e.preventDefault();
+  if (!S.current) return toast("เลือกลูกค้าก่อน");
+  const text = ta.value.trim(); const file = S.pending;
+  if (!text && !file) return;
+  $("sendBtn").disabled = true;
+  try {
+    const payload = { contact_id:S.current.id, text };
+    if (file) {
+      const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const path = `out/${new Date().toISOString().slice(0,7)}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await sb.storage.from("media").upload(path, file, { contentType:file.type || undefined });
+      if (error) throw new Error("อัปโหลดไม่สำเร็จ: " + error.message);
+      payload.media_url = sb.storage.from("media").getPublicUrl(path).data.publicUrl;
+      payload.file_name = file.name;
+      payload.media_kind = file.type.startsWith("image/") ? "image"
+        : file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : "file";
+    }
+    const { data, error } = await sb.functions.invoke("send-message", { body:payload });
+    if (error) {
+      let msg = error.message;
+      try { msg = (await error.context.json()).error || msg; } catch (_) {}
+      throw new Error(msg);
+    }
+    if (!data?.ok) throw new Error(data?.error || "ส่งไม่สำเร็จ");
+    ta.value = ""; ta.style.height = "auto"; clearAttach();
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    $("sendBtn").disabled = false; ta.focus();
+  }
+};
+
+// ===================================================================
+// INFO PANEL (ผู้ดูแล / ฝ่าย / สถานะ / โน้ต)
+// ===================================================================
+async function renderInfo() {
+  const c = S.current; if (!c) return;
+  const [{ data: notes }, { data: logs }] = await Promise.all([
+    sb.from("notes").select("*").eq("contact_id", c.id).order("created_at", { ascending:false }),
+    sb.from("activity_log").select("*").eq("contact_id", c.id).order("created_at", { ascending:false }).limit(20),
+  ]);
+  const staffOpts = `<option value="">— ยังไม่มี —</option>` + Object.values(S.staff).filter(s => s.active)
+    .map(s => `<option value="${s.id}"${s.id === c.assigned_to ? " selected" : ""}>${esc(s.display_name)}</option>`).join("");
+  const unitOpts = `<option value="">— ยังไม่ระบุ —</option>` + Object.entries(UNITS)
+    .map(([k, v]) => `<option value="${k}"${k === c.business_unit ? " selected" : ""}>${v}</option>`).join("");
+  const stOpts = [["open","เปิดอยู่"],["pending","รอดำเนินการ"],["closed","ปิดแล้ว"]]
+    .map(([k, v]) => `<option value="${k}"${k === c.status ? " selected" : ""}>${v}</option>`).join("");
+
+  $("infoCol").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center"><h3>ข้อมูลลูกค้า</h3>
+      <button class="iconbtn" style="width:30px;height:30px;font-size:14px" onclick="$('infoCol').classList.add('closed')">✕</button></div>
+    <div style="display:flex;gap:10px;align-items:center">${avatar(c)}
+      <div><div style="font-weight:600">${esc(c.display_name)}</div>
+      <div class="log">ทักครั้งแรก ${dayLabel(c.created_at)}</div></div></div>
+    <div class="field"><label>ติดต่อเรื่อง (ฝ่าย)</label><select data-f="business_unit">${unitOpts}</select></div>
+    <div class="field"><label>ผู้ดูแลลูกค้า</label><select data-f="assigned_to">${staffOpts}</select></div>
+    <div class="field"><label>สถานะ</label><select data-f="status">${stOpts}</select></div>
+    <h3>โน้ตภายใน <span style="text-transform:none;font-weight:400">(ลูกค้าไม่เห็น)</span></h3>
+    <div style="display:grid;gap:6px">
+      <textarea id="noteText" placeholder="เช่น สนใจคอร์ส ROS 2, ขอใบเสนอราคา Iron-X…"></textarea>
+      <button class="btn" id="addNote">บันทึกโน้ต</button>
+    </div>
+    <div style="display:grid;gap:8px">${(notes || []).map(n => `<div class="note">${linkify(n.body)}
+      <div class="by">${esc(S.staff[n.author]?.display_name || "?")} · ${dayLabel(n.created_at)} ${hhmm(n.created_at)}</div></div>`).join("")
+      || `<div class="log">ยังไม่มีโน้ต</div>`}</div>
+    <h3>ประวัติการเปลี่ยนแปลง</h3>
+    <div style="display:grid;gap:4px">${(logs || []).map(l => `<div class="log">${hhmm(l.created_at)} ${dayLabel(l.created_at)} — ${esc(S.staff[l.actor]?.display_name || "?")} ${esc(l.action)}</div>`).join("")
+      || `<div class="log">–</div>`}</div>`;
+
+  $("infoCol").querySelectorAll("select[data-f]").forEach(sel => sel.onchange = async () => {
+    const f = sel.dataset.f, v = sel.value || null;
+    const { error } = await sb.from("contacts").update({ [f]:v }).eq("id", c.id);
+    if (error) return toast("บันทึกไม่สำเร็จ");
+    const label = f === "assigned_to" ? `มอบหมายให้ ${S.staff[v]?.display_name || "ไม่มี"}`
+      : f === "business_unit" ? `ตั้งฝ่ายเป็น ${UNITS[v] || "ไม่ระบุ"}` : `เปลี่ยนสถานะเป็น ${sel.selectedOptions[0].text}`;
+    await sb.from("activity_log").insert({ contact_id:c.id, actor:S.me.id, action:label, detail:{ [f]:v } });
+    toast("บันทึกแล้ว"); renderInfo();
+  });
+  $("addNote").onclick = async () => {
+    const body = $("noteText").value.trim(); if (!body) return;
+    const { error } = await sb.from("notes").insert({ contact_id:c.id, author:S.me.id, body });
+    if (error) return toast("บันทึกโน้ตไม่สำเร็จ");
+    renderInfo();
+  };
+}
+
+// ===================================================================
+// REALTIME
+// ===================================================================
+function subscribe() {
+  sb.channel("tesr-chat")
+    .on("postgres_changes", { event:"*", schema:"public", table:"contacts" }, ({ eventType, new:row }) => {
+      const i = S.contacts.findIndex(c => c.id === row.id);
+      if (eventType === "INSERT" || i < 0) S.contacts.unshift(row); else S.contacts[i] = row;
+      S.contacts.sort((a, b) => new Date(b.last_message_at) - new Date(a.last_message_at));
+      if (S.current?.id === row.id) { S.current = row; renderHead(); }
+      renderList();
+    })
+    .on("postgres_changes", { event:"INSERT", schema:"public", table:"messages" }, ({ new:m }) => {
+      if (S.current?.id === m.contact_id && S.msgs) {
+        S.msgs.push(m); renderMsgs();
+        if (m.direction === "in") sb.from("contacts").update({ unread:0 }).eq("id", m.contact_id);
+      } else if (m.direction === "in") {
+        notify(m);
+      }
+    })
+    .on("postgres_changes", { event:"INSERT", schema:"public", table:"notes" }, ({ new:n }) => {
+      if (S.current?.id === n.contact_id && n.author !== S.me.id) renderInfo();
+    })
+    .subscribe();
+}
+
+function notify(m) {
+  const c = S.contacts.find(x => x.id === m.contact_id);
+  document.title = "🔴 ข้อความใหม่ — TESR Chat";
+  if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+    new Notification(`${CH[m.channel]?.name}: ${c?.display_name || "ลูกค้า"}`, { body:m.text || "[ไฟล์/รูป]" });
+  }
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) document.title = "TESR Chat"; });
+document.addEventListener("click", () => {
+  if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+}, { once:true });
+
+// ===================================================================
+// VIEW SWITCH + DASHBOARD
+// ===================================================================
+document.querySelectorAll("header nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("header nav button").forEach(x => x.classList.toggle("on", x === b));
+  const v = b.dataset.view;
+  $("inboxView").classList.toggle("hidden", v !== "inbox");
+  $("dashView").classList.toggle("hidden", v !== "dash");
+  $("settingsView").classList.toggle("hidden", v !== "settings");
+  if (v === "dash") loadDash();
+  if (v === "settings") loadSettings();
+});
+
+function rangeDates() {
+  const to = new Date(), from = new Date(); from.setHours(0,0,0,0);
+  if (S.range === "7d") from.setDate(from.getDate() - 6);
+  if (S.range === "30d") from.setDate(from.getDate() - 29);
+  if (S.range === "month") from.setDate(1);
+  to.setDate(to.getDate() + 1); to.setHours(0,0,0,0);
+  return { from:from.toISOString(), to:to.toISOString() };
+}
+
+async function loadDash() {
+  const ranges = [["today","วันนี้"],["7d","7 วัน"],["30d","30 วัน"],["month","เดือนนี้"]];
+  $("rangeChips").innerHTML = ranges.map(([k, v]) => `<button class="chip${k === S.range ? " on" : ""}" data-r="${k}">${v}</button>`).join("");
+  $("rangeChips").onclick = (e) => { const b = e.target.closest("[data-r]"); if (b) { S.range = b.dataset.r; loadDash(); } };
+
+  const { from, to } = rangeDates();
+  const [{ data: stats }, { data: msgs }] = await Promise.all([
+    sb.rpc("staff_stats", { p_from:from, p_to:to }),
+    sb.from("messages").select("channel,direction,response_seconds,contact_id")
+      .gte("created_at", from).lt("created_at", to).limit(20000),
+  ]);
+  const ins = (msgs || []).filter(m => m.direction === "in");
+  const outs = (msgs || []).filter(m => m.direction === "out" && m.response_seconds != null);
+  const avg = outs.length ? outs.reduce((a, m) => a + m.response_seconds, 0) / outs.length : null;
+  const waitingNow = S.contacts.filter(c => c.awaiting_since).length;
+  const customers = new Set(ins.map(m => m.contact_id)).size;
+
+  $("kpis").innerHTML = [
+    ["ข้อความเข้า", ins.length.toLocaleString()],
+    ["ลูกค้าที่ทักมา", customers.toLocaleString()],
+    ["เวลาตอบเฉลี่ย", dur(avg)],
+    ["ตอบช้า (>" + SLOW / 60 + " นาที)", outs.filter(m => m.response_seconds > SLOW).length],
+    ["รอตอบตอนนี้", waitingNow],
+  ].map(([k, v]) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+
+  $("staffTbl").innerHTML = `<tr><th>พนักงาน</th><th class="num">ครั้งที่ตอบ</th><th class="num">ลูกค้าที่ดูแล</th>
+    <th class="num">เวลาตอบเฉลี่ย</th><th class="num">ค่ากลาง</th><th class="num">ตอบช้า</th></tr>` +
+    (stats || []).map(s => `<tr><td>${esc(s.display_name)}</td><td class="num">${s.replies}</td><td class="num">${s.customers}</td>
+      <td class="num">${dur(s.avg_response_sec)}</td><td class="num">${dur(s.median_response_sec)}</td>
+      <td class="num" style="${s.slow_replies ? "color:var(--bad);font-weight:600" : ""}">${s.slow_replies}</td></tr>`).join("");
+
+  const byCh = {};
+  for (const m of msgs || []) {
+    const b = byCh[m.channel] ||= { in:0, out:0, rs:[] };
+    m.direction === "in" ? b.in++ : b.out++;
+    if (m.response_seconds != null) b.rs.push(m.response_seconds);
+  }
+  $("chanTbl").innerHTML = `<tr><th>ช่องทาง</th><th class="num">ข้อความเข้า</th><th class="num">ตอบกลับ</th><th class="num">เวลาตอบเฉลี่ย</th></tr>` +
+    (Object.entries(byCh).map(([k, b]) => `<tr><td><span style="color:${CH[k]?.color}">●</span> ${CH[k]?.name || k}</td>
+      <td class="num">${b.in}</td><td class="num">${b.out}</td>
+      <td class="num">${dur(b.rs.length ? b.rs.reduce((a, x) => a + x, 0) / b.rs.length : null)}</td></tr>`).join("")
+      || `<tr><td colspan="4" style="color:var(--muted)">ยังไม่มีข้อมูล</td></tr>`);
+}
+
+$("exportBtn").onclick = async () => {
+  const { from, to } = rangeDates();
+  const { data, error } = await sb.from("messages")
+    .select("created_at,channel,direction,msg_type,text,media_url,response_seconds,sent_by,contacts(display_name,business_unit)")
+    .gte("created_at", from).lt("created_at", to).order("created_at").limit(50000);
+  if (error) return toast("Export ไม่สำเร็จ");
+  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const rows = [["เวลา","ช่องทาง","ลูกค้า","ฝ่าย","ทิศทาง","ประเภท","ข้อความ","ไฟล์","ผู้ตอบ","เวลาตอบ(วินาที)"]]
+    .concat((data || []).map(m => [
+      new Date(m.created_at).toLocaleString("th-TH"), CH[m.channel]?.name || m.channel,
+      m.contacts?.display_name, UNITS[m.contacts?.business_unit] || "",
+      m.direction === "in" ? "ลูกค้า" : "ทีม", m.msg_type, m.text, m.media_url,
+      S.staff[m.sent_by]?.display_name || "", m.response_seconds ?? "",
+    ]));
+  const csv = "﻿" + rows.map(r => r.map(q).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type:"text/csv;charset=utf-8" }));
+  a.download = `tesr-chat-${S.range}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+};
+
+// ===================================================================
+// SETTINGS (admin)
+// ===================================================================
+const FN = CFG.SUPABASE_URL.replace(/\/$/, "") + "/functions/v1/";
+const rnd = (n = 24) => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, "0")).join("").slice(0, n * 2);
+
+// คู่มือ + ช่องกรอกของแต่ละช่องทาง
+const SETUP = {
+  line: {
+    ready: true, webhook: "line-webhook",
+    fields: [
+      { key:"channel_secret", label:"Channel secret", secret:true, hint:"LINE Developers > Basic settings" },
+      { key:"channel_access_token", label:"Channel access token (long-lived)", secret:true, hint:"LINE Developers > Messaging API > กด Issue" },
+      { key:"basic_id", label:"Basic ID (ไม่บังคับ)", placeholder:"@tesr" },
+    ],
+    actions: [{ id:"line_set_webhook", label:"🔗 ตั้ง Webhook อัตโนมัติ" }],
+    steps: [
+      `เข้า <a href="https://manager.line.biz" target="_blank" rel="noopener">LINE OA Manager</a> > เลือก OA > <b>ตั้งค่า</b> > <b>Messaging API</b> > กด <b>เปิดใช้ Messaging API</b> (เลือก/สร้าง Provider ชื่อ TESR)`,
+      `เข้า <a href="https://developers.line.biz/console/" target="_blank" rel="noopener">LINE Developers Console</a> > เลือก Channel ของ OA`,
+      `แท็บ <b>Basic settings</b> คัดลอก <b>Channel secret</b> มาใส่ด้านล่าง`,
+      `แท็บ <b>Messaging API</b> เลื่อนลงล่างสุด กด <b>Issue</b> ที่ <b>Channel access token</b> แล้วคัดลอกมาใส่`,
+      `กด <b>บันทึก</b> แล้วกด <b>ตั้ง Webhook อัตโนมัติ</b> (หรือคัดลอก Webhook URL ไปวางเองในแท็บ Messaging API)`,
+      `ในแท็บ Messaging API เปิด <b>Use webhook</b> และปิด <b>Auto-reply messages</b>`,
+      `กด <b>ทดสอบการเชื่อมต่อ</b> แล้วลองทัก LINE OA จากมือถือ`,
+    ],
+    note: "ตอบภายใน ~1 นาทีหลังลูกค้าทัก = ไม่กินโควตา · ตอบช้ากว่านั้นระบบใช้ Push ซึ่งนับโควตาข้อความของแพ็กเกจ LINE OA",
+  },
+  facebook: {
+    ready: true, webhook: "meta-webhook",
+    fields: [
+      { key:"app_id", label:"App ID", hint:"Meta App > App settings > Basic" },
+      { key:"app_secret", label:"App secret", secret:true, hint:"Meta App > App settings > Basic > Show" },
+      { key:"verify_token", label:"Verify token", gen:true, hint:"ตั้งเองได้ ใช้ตอนผูก Webhook (กด 🎲 เพื่อสุ่ม)" },
+      { key:"page_id", label:"Page ID", hint:"เพจ > เกี่ยวกับ > ความโปร่งใสของเพจ" },
+      { key:"page_access_token", label:"Page access token", secret:true, hint:"แนะนำแบบไม่หมดอายุ (System User token)" },
+      { key:"graph_version", label:"Graph API version", placeholder:"v23.0" },
+    ],
+    actions: [{ id:"fb_subscribe_page", label:"🔗 ผูกเพจกับแอป" }],
+    steps: [
+      `เข้า <a href="https://business.facebook.com/settings" target="_blank" rel="noopener">Meta Business Settings</a> ตรวจว่าเพจ TESR อยู่ใน Business Portfolio ของบริษัท แล้วทำ <b>Business Verification</b> (ใช้หนังสือรับรองบริษัท) — ใช้เวลาหลายวัน เริ่มก่อนได้เลย`,
+      `เข้า <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener">Meta for Developers</a> > <b>Create App</b> > เลือก use case <b>"Engage with customers on Messenger from Meta"</b> และผูกกับ Business Portfolio ของ TESR`,
+      `<b>App settings > Basic</b> คัดลอก <b>App ID</b> และ <b>App secret</b> มาใส่ด้านล่าง`,
+      `สร้าง Page access token: Business Settings > <b>System users</b> > Add (Admin) > <b>Assign assets</b> เลือกเพจ TESR (Full control) และแอปนี้ > <b>Generate token</b> ติ๊ก <code>pages_messaging</code>, <code>pages_manage_metadata</code>, <code>pages_show_list</code>, <code>pages_read_engagement</code> (ถ้าจะใช้ IG ติ๊ก <code>instagram_basic</code>, <code>instagram_manage_messages</code> ด้วย) แล้วคัดลอกมาใส่`,
+      `กด 🎲 สุ่ม Verify token แล้วกด <b>บันทึก</b>`,
+      `ในแอป: <b>Messenger > Messenger API Settings > Configure webhooks</b> ใส่ Callback URL ด้านล่าง + Verify token แล้วกด <b>Verify and save</b> จากนั้นติ๊ก field <code>messages</code>, <code>messaging_postbacks</code>`,
+      `กลับมากด <b>ผูกเพจกับแอป</b> และ <b>ทดสอบการเชื่อมต่อ</b>`,
+      `ก่อนใช้กับลูกค้าจริง: ส่ง <b>App Review</b> ขอ Advanced Access ของ <code>pages_messaging</code> และเปลี่ยนแอปเป็น <b>Live</b> (ระหว่างรอ ทดสอบได้กับบัญชีที่มี role ในแอป)`,
+    ],
+    note: "Meta ให้ตอบได้ภายใน 24 ชม. หลังลูกค้าทักล่าสุด · ข้อความที่ตอบจาก Meta Business Suite จะไม่ถูกบันทึกในระบบนี้",
+  },
+  instagram: {
+    ready: true, webhook: "meta-webhook", sharedWith: "facebook",
+    fields: [
+      { key:"ig_user_id", label:"Instagram account ID", hint:"Graph API Explorer: GET /{page-id}?fields=instagram_business_account" },
+      { key:"page_access_token", label:"Page access token (ไม่บังคับ)", secret:true, hint:"เว้นว่าง = ใช้ token เดียวกับ Facebook" },
+    ],
+    actions: [],
+    steps: [
+      `ต้องตั้งค่า <b>Facebook</b> ให้เสร็จก่อน (ใช้ Meta App เดียวกัน)`,
+      `ในแอป Instagram ของ TESR: เปลี่ยนเป็น <b>บัญชีมืออาชีพ (Business)</b> และ <b>เชื่อมกับเพจ Facebook</b> ของ TESR`,
+      `ในแอป Instagram: <b>ตั้งค่า > ข้อความและการตอบกลับเรื่องราว > เครื่องมือการเชื่อมต่อ</b> > เปิด <b>อนุญาตการเข้าถึงข้อความ</b>`,
+      `หา Instagram account ID ด้วย <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener">Graph API Explorer</a>: <code>GET /{page-id}?fields=instagram_business_account</code> แล้วนำ <code>id</code> มาใส่`,
+      `ในแอป Meta: <b>Webhooks</b> > เลือก object <b>Instagram</b> > Subscribe ด้วย Callback URL + Verify token เดียวกับ Facebook > ติ๊ก field <code>messages</code>`,
+      `บันทึก แล้วกด <b>ทดสอบการเชื่อมต่อ</b> · ส่ง App Review ขอ <code>instagram_manage_messages</code> ก่อนใช้จริง`,
+    ],
+    note: "ส่งไฟล์ PDF ทาง IG ไม่ได้ ระบบจะส่งเป็นลิงก์แทน",
+  },
+  tiktok: {
+    ready: false,
+    fields: [
+      { key:"app_key", label:"App ID / Client key" },
+      { key:"app_secret", label:"App secret", secret:true },
+      { key:"business_id", label:"TikTok Business account ID" },
+      { key:"access_token", label:"Access token", secret:true },
+    ],
+    steps: [
+      `เปลี่ยนบัญชี TikTok ของ TESR เป็น <b>Business Account</b> และตั้งให้ <b>รับข้อความจากทุกคน</b>`,
+      `เชื่อมบัญชีกับ <a href="https://business.tiktok.com" target="_blank" rel="noopener">TikTok Business Center</a>`,
+      `สมัคร developer ที่ <a href="https://business-api.tiktok.com/portal" target="_blank" rel="noopener">TikTok API for Business</a> > สร้างแอป > ขอสิทธิ์ <b>Business Messaging</b>`,
+      `เมื่อได้รับอนุมัติ ใส่ค่าที่ได้ด้านล่างแล้วบันทึก (ตัวเชื่อมต่อจะเปิดในเฟสถัดไป)`,
+    ],
+    note: "TikTok ตอบได้ภายใน 48 ชม. และร้านทักลูกค้าก่อนไม่ได้",
+  },
+  youtube: {
+    ready: false,
+    fields: [
+      { key:"api_key", label:"YouTube Data API key", secret:true },
+      { key:"channel_id", label:"Channel ID", placeholder:"UCxxxxxxxx" },
+      { key:"poll_minutes", label:"ดึงคอมเมนต์ทุกกี่นาที", placeholder:"15" },
+    ],
+    steps: [
+      `YouTube <b>ไม่มีระบบ DM</b> — ระบบจะดึง <b>คอมเมนต์</b> ใต้คลิปมาเป็นแชตแทน`,
+      `เข้า <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener">Google Cloud Console</a> > เปิดใช้ <b>YouTube Data API v3</b> > Credentials > <b>Create API key</b>`,
+      `หา Channel ID ที่ YouTube Studio > ตั้งค่า > ช่อง > ขั้นสูง`,
+      `ใส่ค่าแล้วบันทึก กดทดสอบได้ (ตัวดึงคอมเมนต์จะเปิดในเฟสถัดไป · การตอบคอมเมนต์ต้องใช้ OAuth เพิ่ม)`,
+    ],
+  },
+  shopee: {
+    ready: false,
+    fields: [
+      { key:"partner_id", label:"Partner ID" },
+      { key:"partner_key", label:"Partner key", secret:true },
+      { key:"shop_id", label:"Shop ID" },
+      { key:"access_token", label:"Access token", secret:true },
+      { key:"refresh_token", label:"Refresh token", secret:true },
+    ],
+    steps: [
+      `สมัคร <a href="https://open.shopee.com" target="_blank" rel="noopener">Shopee Open Platform</a> ในนามบริษัท (ประเภท Seller in-house system)`,
+      `สร้างแอปและขอสิทธิ์ <b>SellerChat API</b> (ต้องรอ Shopee อนุมัติ)`,
+      `Authorize ร้าน TESR Shop กับแอป แล้วนำค่าที่ได้มาใส่`,
+    ],
+  },
+  lazada: {
+    ready: false,
+    fields: [
+      { key:"app_key", label:"App key" },
+      { key:"app_secret", label:"App secret", secret:true },
+      { key:"seller_id", label:"Seller ID" },
+      { key:"access_token", label:"Access token", secret:true },
+      { key:"refresh_token", label:"Refresh token", secret:true },
+    ],
+    steps: [
+      `สมัคร <a href="https://open.lazada.com" target="_blank" rel="noopener">Lazada Open Platform</a> > สร้างแอปประเภท <b>Seller In-house APP</b>`,
+      `ขอสิทธิ์ <b>IM (Instant Messaging) API</b> และรออนุมัติ`,
+      `Authorize ร้าน TESR แล้วนำค่าที่ได้มาใส่`,
+    ],
+  },
+};
+
+let SET_TAB = "channels";
+$("setTabs").onclick = (e) => {
+  const b = e.target.closest("[data-t]"); if (!b) return;
+  SET_TAB = b.dataset.t;
+  $("setTabs").querySelectorAll(".chip").forEach(x => x.classList.toggle("on", x === b));
+  loadSettings();
+};
+
+async function adminApi(body) {
+  const { data, error } = await sb.functions.invoke("admin-api", { body });
+  if (error) {
+    try { return await error.context.json(); } catch (_) { return { ok:false, msg:error.message }; }
+  }
+  return data;
+}
+
+function loadSettings() {
+  if (S.me?.role !== "admin") return;
+  ({ channels:renderChannels, staff:renderStaffAdmin, general:renderGeneral })[SET_TAB]();
+}
+
+async function renderChannels() {
+  $("setBody").innerHTML = `<div class="empty" style="padding:20px">กำลังโหลด…</div>`;
+  const { data, error } = await sb.rpc("admin_get_channels");
+  if (error) { $("setBody").innerHTML = `<div class="warnbox">โหลดไม่สำเร็จ: ${esc(error.message)} — รัน schema.sql ล่าสุดแล้วหรือยัง?</div>`; return; }
+  const openId = document.querySelector(".chcard[open]")?.dataset.ch;
+
+  $("setBody").innerHTML = `<div style="display:grid;gap:10px">` + data.map(row => {
+    const sp = SETUP[row.channel], ch = CH[row.channel];
+    const status = !sp.ready ? `<span class="pill soon">เฟสถัดไป</span>`
+      : !row.enabled ? `<span class="pill">ปิดอยู่</span>`
+      : row.last_test_ok === true ? `<span class="pill ok">เชื่อมต่อแล้ว</span>`
+      : row.last_test_ok === false ? `<span class="pill bad">มีปัญหา</span>`
+      : `<span class="pill">ยังไม่ทดสอบ</span>`;
+    const fields = sp.fields.map(f => {
+      const isSet = row.secrets_set.includes(f.key);
+      const val = f.secret ? "" : (row.config?.[f.key] ?? "");
+      return `<div class="field"><label>${esc(f.label)}${f.secret ? (isSet ? ` <span class="pill ok">ใส่แล้ว</span>` : ` <span class="pill">ยังไม่ใส่</span>`) : ""}</label>
+        <div style="display:flex;gap:6px">
+          <input data-k="${f.key}" data-secret="${f.secret ? 1 : 0}" type="${f.secret ? "password" : "text"}" value="${esc(val)}"
+            placeholder="${f.secret ? (isSet ? "•••••• (เว้นว่าง = ใช้ค่าเดิม)" : "วางค่าที่นี่") : esc(f.placeholder || "")}" autocomplete="off">
+          ${f.gen ? `<button type="button" class="iconbtn" data-gen title="สุ่มค่าใหม่">🎲</button>` : ""}
+          ${f.secret && isSet ? `<button type="button" class="iconbtn" data-clear title="ลบค่านี้">🗑</button>` : ""}
+        </div>${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ""}</div>`;
+    }).join("");
+    const hookUrl = sp.webhook ? FN + sp.webhook : "";
+    return `<details class="chcard" data-ch="${row.channel}"${openId === row.channel ? " open" : ""}>
+      <summary><span class="chdot" style="background:${ch.color}">${ch.s}</span>
+        <div style="flex:1;min-width:0"><div style="font-weight:600">${ch.name}</div>
+          <div class="hint">${row.last_test_msg ? esc(row.last_test_msg) : (sp.ready ? "ยังไม่ได้ตั้งค่า" : "บันทึกค่าเตรียมไว้ได้")}</div></div>
+        ${status}</summary>
+      <div class="chbody">
+        <ol class="steps">${sp.steps.map(s => `<li>${s}</li>`).join("")}</ol>
+        ${sp.note ? `<div class="warnbox">${esc(sp.note)}</div>` : ""}
+        ${hookUrl ? `<div class="field"><label>${row.channel === "line" ? "Webhook URL" : "Callback URL"}</label>
+          <div class="copybox"><code>${esc(hookUrl)}</code><button type="button" class="btn ghost" style="padding:4px 10px" data-copy="${esc(hookUrl)}">คัดลอก</button></div></div>` : ""}
+        <div class="fgrid">${fields}</div>
+        <label class="switch"><input type="checkbox" data-enabled${row.enabled ? " checked" : ""}> เปิดใช้งานช่องทางนี้ (รับ–ส่งข้อความ)</label>
+        <div class="btnrow">
+          <button class="btn" data-save>💾 บันทึก</button>
+          ${sp.ready || row.channel === "youtube" ? `<button class="btn ghost" data-act="test">✓ ทดสอบการเชื่อมต่อ</button>` : ""}
+          ${(sp.actions || []).map(a => `<button class="btn ghost" data-act="${a.id}">${a.label}</button>`).join("")}
+        </div>
+        ${row.updated_by_name ? `<div class="hint">แก้ไขล่าสุดโดย ${esc(row.updated_by_name)} · ${dayLabel(row.updated_at)} ${hhmm(row.updated_at)}</div>` : ""}
+      </div></details>`;
+  }).join("") + `</div>
+  <div class="hint" style="margin-top:12px">🔒 Token และ Secret ถูกเก็บในฐานข้อมูลส่วนที่หน้าเว็บอ่านไม่ได้ — เมื่อบันทึกแล้วจะไม่แสดงค่าอีก ถ้าจะเปลี่ยนให้วางค่าใหม่ทับ</div>`;
+
+  $("setBody").querySelectorAll(".chcard").forEach(card => {
+    const channel = card.dataset.ch;
+    card.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => {
+      navigator.clipboard.writeText(b.dataset.copy).then(() => toast("คัดลอกแล้ว"));
+    });
+    card.querySelectorAll("[data-gen]").forEach(b => b.onclick = () => { b.previousElementSibling.value = rnd(16); });
+    card.querySelectorAll("[data-clear]").forEach(b => b.onclick = () => {
+      const inp = b.parentElement.querySelector("input");
+      inp.dataset.clear = "1"; inp.value = ""; inp.placeholder = "จะถูกลบเมื่อกดบันทึก"; b.remove();
+    });
+    card.querySelector("[data-save]").onclick = async (e) => {
+      const btn = e.currentTarget; btn.disabled = true;
+      const config = {}, secrets = {};
+      card.querySelectorAll("input[data-k]").forEach(i => {
+        const v = i.value.trim();
+        if (i.dataset.secret === "1") { if (i.dataset.clear) secrets[i.dataset.k] = null; else if (v) secrets[i.dataset.k] = v; }
+        else if (v) config[i.dataset.k] = v;
+      });
+      const { error } = await sb.rpc("admin_save_channel", {
+        p_channel:channel, p_enabled:card.querySelector("[data-enabled]").checked, p_config:config, p_secrets:secrets,
+      });
+      btn.disabled = false;
+      if (error) return toast("บันทึกไม่สำเร็จ: " + error.message);
+      toast("บันทึกแล้ว");
+      if (SETUP[channel].ready || channel === "youtube") {
+        const r = await adminApi({ action:"test", channel });
+        toast(r?.msg || "ทดสอบแล้ว");
+      }
+      renderChannels();
+    };
+    card.querySelectorAll("[data-act]").forEach(b => b.onclick = async () => {
+      b.disabled = true; const old = b.textContent; b.textContent = "กำลังทำงาน…";
+      const r = await adminApi({ action:b.dataset.act, channel });
+      b.disabled = false; b.textContent = old;
+      toast((r?.ok ? "✓ " : "✕ ") + (r?.msg || "ไม่ทราบผล"));
+      if (b.dataset.act === "test") renderChannels();
+    });
+  });
+}
+
+async function renderStaffAdmin() {
+  $("setBody").innerHTML = `<div class="empty" style="padding:20px">กำลังโหลด…</div>`;
+  const [{ data: staff }, users] = await Promise.all([
+    sb.from("staff").select("*").order("created_at"),
+    adminApi({ action:"list_users" }),
+  ]);
+  const emails = Object.fromEntries((users?.data || []).map(u => [u.id, u]));
+  $("setBody").innerHTML = `
+    <div class="card" style="display:grid;gap:10px">
+      <div style="font-weight:600">เพิ่มพนักงาน</div>
+      <div class="fgrid">
+        <div class="field"><label>ชื่อที่แสดง</label><input id="nuName" class="inp" placeholder="เช่น แอน (Shop)"></div>
+        <div class="field"><label>อีเมล (ใช้ล็อกอิน)</label><input id="nuEmail" class="inp" type="email"></div>
+        <div class="field"><label>รหัสผ่านเริ่มต้น (≥ 8 ตัว)</label><input id="nuPass" class="inp" type="text" value="${rnd(5)}"></div>
+        <div class="field"><label>สิทธิ์</label><select id="nuRole" class="inp"><option value="agent">พนักงาน</option><option value="admin">แอดมิน</option></select></div>
+      </div>
+      <div><button class="btn" id="nuAdd">+ เพิ่มพนักงาน</button></div>
+      <div class="hint">ส่งอีเมลและรหัสผ่านให้พนักงานเอง ระบบไม่ส่งอีเมลให้</div>
+    </div>
+    <div style="overflow-x:auto;margin-top:14px"><table>
+      <tr><th>ชื่อ</th><th>อีเมล</th><th>สิทธิ์</th><th>ใช้งาน</th><th>เข้าใช้ล่าสุด</th><th></th></tr>
+      ${(staff || []).map(s => `<tr data-id="${s.id}">
+        <td><input class="inp" data-f="display_name" value="${esc(s.display_name)}" style="padding:5px 8px;min-width:120px"></td>
+        <td style="font-size:13px">${esc(emails[s.id]?.email || "")}</td>
+        <td><select class="inp" data-f="role" style="padding:5px 8px"><option value="agent"${s.role === "agent" ? " selected" : ""}>พนักงาน</option><option value="admin"${s.role === "admin" ? " selected" : ""}>แอดมิน</option></select></td>
+        <td><input type="checkbox" data-f="active"${s.active ? " checked" : ""} style="width:18px;height:18px;accent-color:var(--brand)"></td>
+        <td style="font-size:13px;color:var(--muted)">${emails[s.id]?.last_sign_in_at ? dayLabel(emails[s.id].last_sign_in_at) : "–"}</td>
+        <td><button class="btn ghost" data-pw style="padding:4px 10px;font-size:13px">ตั้งรหัสใหม่</button></td>
+      </tr>`).join("")}
+    </table></div>`;
+
+  $("nuAdd").onclick = async () => {
+    const r = await adminApi({ action:"create_user", name:$("nuName").value.trim(), email:$("nuEmail").value.trim(),
+      password:$("nuPass").value, role:$("nuRole").value });
+    toast(r?.msg || "เสร็จ");
+    if (r?.ok) { await loadStaff(); renderStaffAdmin(); }
+  };
+  $("setBody").querySelectorAll("tr[data-id]").forEach(tr => {
+    const id = tr.dataset.id;
+    tr.querySelectorAll("[data-f]").forEach(el => el.onchange = async () => {
+      const v = el.type === "checkbox" ? el.checked : el.value.trim();
+      const { error } = await sb.from("staff").update({ [el.dataset.f]:v }).eq("id", id);
+      if (error) { toast(error.message); return renderStaffAdmin(); }
+      toast("บันทึกแล้ว"); loadStaff();
+    });
+    tr.querySelector("[data-pw]").onclick = async () => {
+      const pw = prompt("รหัสผ่านใหม่ (อย่างน้อย 8 ตัว)", rnd(5)); if (!pw) return;
+      const r = await adminApi({ action:"reset_password", user_id:id, password:pw });
+      toast(r?.ok ? `เปลี่ยนแล้ว: ${pw}` : (r?.msg || "ไม่สำเร็จ"));
+    };
+  });
+}
+
+function renderGeneral() {
+  const st = S.settings || {};
+  $("setBody").innerHTML = `
+    <div class="card" style="display:grid;gap:12px;max-width:520px">
+      <div class="field"><label>ถือว่า "ตอบช้า" เมื่อเกิน (นาที)</label>
+        <input class="inp" id="gSlow" type="number" min="1" value="${esc(st.slow_reply_min ?? 10)}"></div>
+      <div class="field"><label>ชื่อบริษัท</label><input class="inp" id="gName" value="${esc(st.company_name ?? "TESR")}"></div>
+      <div><button class="btn" id="gSave">💾 บันทึก</button></div>
+    </div>
+    <div class="card" style="display:grid;gap:10px;max-width:520px;margin-top:14px">
+      <div style="font-weight:600">สำรองข้อมูล</div>
+      <div class="hint">ไฟล์ CSV เปิดใน Excel หรือ Google Sheets ได้ (ไม่รวม token/secret เพื่อความปลอดภัย)</div>
+      <div class="btnrow">
+        <button class="btn ghost" id="bkSettings">⬇ การตั้งค่าช่องทาง (CSV)</button>
+        <button class="btn ghost" id="bkContacts">⬇ รายชื่อลูกค้าทั้งหมด (CSV)</button>
+      </div>
+    </div>`;
+  $("gSave").onclick = async () => {
+    const rows = [{ key:"slow_reply_min", value:Number($("gSlow").value) || 10 }, { key:"company_name", value:$("gName").value.trim() }];
+    const { error } = await sb.from("app_settings").upsert(rows.map(r => ({ ...r, updated_at:new Date().toISOString() })));
+    if (error) return toast("บันทึกไม่สำเร็จ");
+    rows.forEach(r => S.settings[r.key] = r.value); SLOW = Number(S.settings.slow_reply_min) * 60;
+    toast("บันทึกแล้ว");
+  };
+  $("bkSettings").onclick = async () => {
+    const { data } = await sb.rpc("admin_get_channels");
+    downloadCsv("tesr-chat-channels", [["ช่องทาง","เปิดใช้","ค่าตั้ง (ไม่รวม secret)","secret ที่ตั้งแล้ว","ทดสอบล่าสุด","ผล"]]
+      .concat((data || []).map(r => [CH[r.channel]?.name, r.enabled ? "เปิด" : "ปิด", JSON.stringify(r.config),
+        r.secrets_set.join(" "), r.last_test_at ? new Date(r.last_test_at).toLocaleString("th-TH") : "", r.last_test_msg])));
+  };
+  $("bkContacts").onclick = async () => {
+    const { data } = await sb.from("contacts").select("*").order("created_at");
+    downloadCsv("tesr-chat-contacts", [["ชื่อ","ช่องทาง","ID ในแพลตฟอร์ม","ฝ่าย","ผู้ดูแล","สถานะ","ทักครั้งแรก","ข้อความล่าสุด"]]
+      .concat((data || []).map(c => [c.display_name, CH[c.channel]?.name, c.platform_user_id, UNITS[c.business_unit] || "",
+        S.staff[c.assigned_to]?.display_name || "", c.status, new Date(c.created_at).toLocaleString("th-TH"),
+        new Date(c.last_message_at).toLocaleString("th-TH")])));
+  };
+}
+
+function downloadCsv(name, rows) {
+  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["﻿" + rows.map(r => r.map(q).join(",")).join("\r\n")], { type:"text/csv;charset=utf-8" }));
+  a.download = `${name}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+</script>
+</body>
+</html>
