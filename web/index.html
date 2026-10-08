@@ -156,7 +156,9 @@ header .me{margin-left:auto;display:flex;gap:10px;align-items:center;color:var(-
 .note{background:var(--bg);border-radius:10px;padding:8px 10px;font-size:14px;white-space:pre-wrap}
 .note .by{font-size:11px;color:var(--muted);margin-top:4px}
 #noteText{width:100%;min-height:60px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);resize:vertical}
-.log{font-size:12px;color:var(--muted)}
+.log{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.info{min-width:0} .info > *{min-width:0}
+.msg.sending{opacity:.6}
 
 /* dashboard */
 .dash{overflow-y:auto;padding:20px;display:grid;gap:18px;align-content:start;max-width:1100px;width:100%;margin:0 auto}
@@ -363,7 +365,7 @@ const S = { me:null, staff:{}, contacts:[], current:null, chan:"", pending:null,
 // ===================================================================
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-const safeUrl = (u) => /^https?:\/\//i.test(u || "") ? esc(u) : "#";
+const safeUrl = (u) => /^(https?:\/\/|blob:)/i.test(u || "") ? esc(u) : "#";
 const linkify = (t) => esc(t).replace(/https?:\/\/[^\s<]+/g, u => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
 const pad = (n) => String(n).padStart(2, "0");
 const hhmm = (d) => { d = new Date(d); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
@@ -635,6 +637,7 @@ async function loadContacts() {
 function filtered() {
   const q = $("q").value.trim().toLowerCase(), unit = $("fUnit").value, st = $("fState").value;
   return S.contacts.filter(c => {
+    if (c.last_text === "(ย้ายไปแชตกลุ่มแล้ว)") return false;
     if (S.chan && c.channel !== S.chan) return false;
     if (unit && c.business_unit !== unit) return false;
     if (st === "waiting" && !c.awaiting_since) return false;
@@ -735,9 +738,10 @@ function renderMsgs() {
       meta += ` · ${esc(S.staff[m.sent_by]?.display_name || "ระบบ")}`;
       if (m.response_seconds != null)
         meta += ` · <span class="${m.response_seconds > SLOW ? "slow" : ""}">ตอบใน ${dur(m.response_seconds)}</span>`;
+      if (m.send_status === "sending") meta += " · กำลังส่ง…";
       if (m.send_status === "failed") meta += ` · <span class="slow" title="${esc(m.send_error)}">ส่งไม่สำเร็จ</span>`;
     }
-    html += `<div class="msg ${m.direction}${m.send_status === "failed" ? " failed" : ""}">
+    html += `<div class="msg ${m.direction}${m.send_status === "failed" ? " failed" : ""}${m.send_status === "sending" ? " sending" : ""}">
       <div class="bub">${body || "<i>(ว่าง)</i>"}</div><div class="mt">${meta}</div></div>`;
   }
   $("msgs").innerHTML = html;
@@ -955,27 +959,43 @@ function clearAttach() {
   $("attachBar").classList.add("hidden");
 }
 
-$("composer").onsubmit = async (e) => {
+// ส่งข้อความ: แสดงในแชตทันที (สถานะ "กำลังส่ง…") แล้วค่อยส่งเบื้องหลัง ไม่ต้องรอ
+// คิวส่งเรียงตามลำดับ เพื่อให้ข้อความถึงลูกค้าตามลำดับที่พิมพ์
+let sendQueue = Promise.resolve();
+$("composer").onsubmit = (e) => {
   e.preventDefault();
   if (!S.current) return toast("เลือกลูกค้าก่อน");
-  const text = ta.value.trim(); const file = S.pending;
+  const text = ta.value.trim(), file = S.pending, thumb = S.pendingThumb;
   if (!text && !file) return;
-  $("sendBtn").disabled = true;
+  const contact = S.current;
+  const kind = !file ? "text" : file.type.startsWith("image/") ? "image"
+    : file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : "file";
+  const tmp = {
+    id:`tmp-${Date.now()}-${Math.random()}`, contact_id:contact.id, direction:"out", msg_type:kind,
+    text:text || null, media_url:file ? URL.createObjectURL(file) : null, file_name:file?.name,
+    sent_by:S.me.id, send_status:"sending", created_at:new Date().toISOString(),
+  };
+  if (S.msgs && S.current?.id === contact.id) { S.msgs.push(tmp); renderMsgs(); }
+  ta.value = ""; ta.style.height = "auto"; clearAttach(); ta.focus();
+
+  sendQueue = sendQueue.then(() => sendNow(contact, text, file, thumb, kind, tmp)).catch(() => {});
+};
+
+async function sendNow(contact, text, file, thumb, kind, tmp) {
+  const drop = () => { if (S.msgs) { const i = S.msgs.indexOf(tmp); if (i >= 0) S.msgs.splice(i, 1); } };
   try {
-    const payload = { contact_id:S.current.id, text };
+    const payload = { contact_id:contact.id, text };
     if (file) {
       const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
       const path = `out/${new Date().toISOString().slice(0,7)}/${crypto.randomUUID()}.${ext}`;
-      $("sendBtn").textContent = "กำลังอัปโหลด…";
       const { error } = await sb.storage.from("media").upload(path, file, { contentType:file.type || undefined });
       if (error) throw new Error("อัปโหลดไม่สำเร็จ: " + error.message);
       payload.media_url = sb.storage.from("media").getPublicUrl(path).data.publicUrl;
       payload.file_name = file.name;
-      payload.media_kind = file.type.startsWith("image/") ? "image"
-        : file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : "file";
-      if (payload.media_kind === "video" && S.pendingThumb) { // หน้าปกวิดีโอ (LINE ใช้)
+      payload.media_kind = kind;
+      if (kind === "video" && thumb) { // หน้าปกวิดีโอ (LINE ใช้)
         const tp = path.replace(/\.[a-z0-9]+$/, "") + "-preview.jpg";
-        const up = await sb.storage.from("media").upload(tp, S.pendingThumb, { contentType: "image/jpeg" });
+        const up = await sb.storage.from("media").upload(tp, thumb, { contentType: "image/jpeg" });
         if (!up.error) payload.preview_url = sb.storage.from("media").getPublicUrl(tp).data.publicUrl;
       }
     }
@@ -986,13 +1006,19 @@ $("composer").onsubmit = async (e) => {
       throw new Error(msg);
     }
     if (!data?.ok) throw new Error(data?.error || "ส่งไม่สำเร็จ");
-    ta.value = ""; ta.style.height = "auto"; clearAttach();
+    drop(); // ข้อความจริงเข้ามาทาง realtime แล้ว (หรือกำลังจะเข้า)
   } catch (err) {
+    // ระบบบันทึกข้อความที่ส่งไม่สำเร็จไว้แล้ว (ขึ้นกรอบแดง) — ตัวชั่วคราวลบทิ้ง
+    // ถ้ายังไม่ถึง server เลย (เช่นเน็ตหลุด/อัปโหลดไม่ผ่าน) ให้แสดงเป็นส่งไม่สำเร็จ
+    if (/อัปโหลด|Failed to fetch|NetworkError/i.test(err.message)) {
+      tmp.send_status = "failed"; tmp.send_error = err.message;
+      if (!ta.value && text) ta.value = text;
+    } else drop();
     toast(err.message);
   } finally {
-    $("sendBtn").disabled = false; $("sendBtn").textContent = "ส่ง"; ta.focus();
+    if (S.current?.id === contact.id && S.msgs) renderMsgs();
   }
-};
+}
 
 // ===================================================================
 // INFO PANEL (ผู้ดูแล / ฝ่าย / สถานะ / โน้ต)
@@ -1018,8 +1044,8 @@ async function renderInfo() {
       <div class="log">ชื่อในแพลตฟอร์ม: ${esc(c.display_name)}</div>
       <div class="log">ทักครั้งแรก ${dayLabel(c.created_at)}</div></div></div>
     <div class="field"><label>ตั้งชื่อเรียกในทีม (ลูกค้าไม่เห็น)</label>
-      <div style="display:flex;gap:6px"><input class="inp" id="cName" style="padding:8px 10px" value="${esc(c.custom_name || "")}" placeholder="${esc(c.display_name)}">
-      <button class="btn" id="cNameSave" style="padding:6px 12px">บันทึก</button></div>
+      <div style="display:flex;gap:6px;min-width:0"><input class="inp" id="cName" style="padding:8px 10px;flex:1;min-width:0;width:auto" value="${esc(c.custom_name || "")}" placeholder="${esc(c.display_name)}">
+      <button class="btn" id="cNameSave" style="padding:6px 12px;flex:none;white-space:nowrap">บันทึก</button></div>
       <div class="hint">เว้นว่างแล้วบันทึก = กลับไปใช้ชื่อจากแพลตฟอร์ม</div></div>
     <div class="field"><label>ติดต่อเรื่อง (ฝ่าย)</label><select data-f="business_unit">${unitOpts}</select></div>
     <div class="field"><label>ผู้ดูแลลูกค้า</label><select data-f="assigned_to">${staffOpts}</select></div>
@@ -1079,7 +1105,13 @@ function subscribe() {
     .on("postgres_changes", { event:"INSERT", schema:"public", table:"messages" }, ({ new:m }) => {
       const viewing = S.current?.id === m.contact_id && S.msgs && !document.hidden;
       if (S.current?.id === m.contact_id && S.msgs) {
-        S.msgs.push(m); renderMsgs();
+        const pend = S.msgs.filter(x => x.send_status === "sending");
+        S.msgs = S.msgs.filter(x => x.send_status !== "sending").concat(m, pend);
+        if (m.direction === "out" && m.sent_by === S.me.id) { // ตัวจริงมาแล้ว ลบตัวชั่วคราวที่ตรงกัน
+          const i = S.msgs.findIndex(x => x.send_status === "sending" && (x.text || null) === (m.text || null));
+          if (i >= 0) S.msgs.splice(i, 1);
+        }
+        renderMsgs();
         if (m.direction === "in" && !document.hidden) sb.from("contacts").update({ unread:0 }).eq("id", m.contact_id);
       }
       if (m.direction === "in") notify(m, viewing);
