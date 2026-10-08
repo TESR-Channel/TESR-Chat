@@ -23,9 +23,13 @@ function init(): Promise<boolean> {
 
 export async function notifyStaff(m: {
   contactId: string; channel: string; name?: string | null; text?: string | null; type?: string;
+  sender?: string;
 }) {
   try {
     if (!(await init())) return;
+    // ใช้ชื่อที่ทีมตั้งเอง (ถ้ามี)
+    const { data: ct } = await db.from("contacts").select("custom_name, display_name").eq("id", m.contactId).maybeSingle();
+    const name = ct?.custom_name || ct?.display_name || m.name || "ลูกค้า";
     const { data: subs } = await db.from("push_subscriptions")
       .select("id, endpoint, p256dh, auth, staff!inner(active)")
       .eq("staff.active", true);
@@ -35,9 +39,10 @@ export async function notifyStaff(m: {
       image: "📷 ส่งรูปภาพ", video: "🎬 ส่งวิดีโอ", audio: "🎤 ส่งข้อความเสียง",
       file: "📎 ส่งไฟล์", sticker: "😊 ส่งสติกเกอร์", location: "📍 ส่งตำแหน่ง",
     };
-    const body = (m.type && m.type !== "text" ? media[m.type] ?? "ส่งข้อความ" : (m.text ?? "")).slice(0, 140);
+    const body = ((m.sender ? `${m.sender}: ` : "") +
+      (m.type && m.type !== "text" ? media[m.type] ?? "ส่งข้อความ" : (m.text ?? ""))).slice(0, 140);
     const payload = JSON.stringify({
-      title: `${CH_NAME[m.channel] ?? m.channel} · ${m.name ?? "ลูกค้า"}`,
+      title: `${CH_NAME[m.channel] ?? m.channel} · ${name}`,
       body,
       tag: `tesr-${m.contactId}`,
       contactId: m.contactId,
