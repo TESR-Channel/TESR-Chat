@@ -34,25 +34,32 @@ async function testChannel(channel: string): Promise<Result> {
       return { ok: true, msg: `เชื่อมต่อ ${info.displayName} (${info.basicId}) สำเร็จ · ${hook}`, data: info };
     }
     case "facebook": {
-      const t = c.secrets.page_access_token, page = c.config.page_id;
+      const t = c.secrets.page_access_token, page = c.config.page_id, app = c.config.app_id;
       if (!t) return { ok: false, msg: "ยังไม่ได้ใส่ Page access token" };
-      if (!c.secrets.app_secret) return { ok: false, msg: "ยังไม่ได้ใส่ App secret" };
+      if (!app || !c.secrets.app_secret) return { ok: false, msg: "ยังไม่ได้ใส่ App ID / App secret" };
       if (!c.config.verify_token) return { ok: false, msg: "ยังไม่ได้ตั้ง Verify token" };
-      // ใช้ /me ด้วย Page token (ไม่ต้องขอสิทธิ์ pages_read_engagement เพิ่ม)
-      const r = await fetch(`${GRAPH(c)}/me?fields=id,name&access_token=${encodeURIComponent(t)}`);
+      // ตรวจ token ด้วย debug_token (ใช้ App token = App ID|App secret ไม่ต้องขอสิทธิ์อ่านเพจเพิ่ม)
+      const r = await fetch(`${GRAPH(c)}/debug_token?input_token=${encodeURIComponent(t)}` +
+        `&access_token=${encodeURIComponent(`${app}|${c.secrets.app_secret}`)}`);
       const j = await r.json();
-      if (!r.ok) return { ok: false, msg: `Page access token ใช้ไม่ได้ (กด Generate ใหม่ใน Messenger API Settings): ${j?.error?.message ?? r.status}` };
-      if (page && j.id !== page) {
-        return { ok: false, msg: `Page ID ไม่ตรงกับ token — token นี้เป็นของเพจ "${j.name}" (ID ${j.id}) แก้ช่อง Page ID เป็น ${j.id}` };
+      if (!r.ok) return { ok: false, msg: `App ID / App secret ไม่ถูกต้อง: ${j?.error?.message ?? r.status}` };
+      const d = j.data ?? {};
+      if (!d.is_valid) return { ok: false, msg: `Page access token ใช้ไม่ได้ (กด Generate ใหม่): ${d.error?.message ?? "หมดอายุหรือถูกยกเลิก"}` };
+      if (String(d.app_id) !== String(app)) return { ok: false, msg: `token นี้สร้างจากแอปอื่น (App ID ${d.app_id}) ไม่ใช่แอป ${app}` };
+      if (d.type !== "PAGE") return { ok: false, msg: `นี่เป็น ${d.type} token — ต้องใช้ Page token (กด Generate ที่แถวเพจใน Messenger API Settings)` };
+      if (page && String(d.profile_id) !== String(page)) {
+        return { ok: false, msg: `Page ID ไม่ตรงกับ token — token นี้เป็นของเพจ ID ${d.profile_id} แก้ช่อง Page ID เป็นค่านี้` };
       }
+      const scopes: string[] = d.scopes ?? [];
+      if (!scopes.includes("pages_messaging")) return { ok: false, msg: "token ไม่มีสิทธิ์ pages_messaging — Generate ใหม่และกดอนุญาตทุกข้อ" };
       const s = await fetch(`${GRAPH(c)}/me/subscribed_apps?access_token=${encodeURIComponent(t)}`)
         .then((x) => x.json()).catch(() => ({}));
-      const mine = (s?.data ?? []).find((a: any) => !c.config.app_id || a.id === c.config.app_id) ?? (s?.data ?? [])[0];
-      const fields: string[] = mine?.subscribed_fields ?? [];
-      const sub = !mine ? "⚠️ เพจยังไม่ได้ผูกกับแอป (กด 'ผูกเพจกับแอป')"
-        : !fields.includes("messages") ? "⚠️ ยังไม่ได้รับ field 'messages' (กด 'ผูกเพจกับแอป')"
+      const mine = (s?.data ?? []).find((a: any) => String(a.id) === String(app));
+      const sub = s?.error ? "(เช็กการผูกเพจไม่ได้ ดูที่ Messenger API Settings แทน)"
+        : !mine ? "⚠️ เพจยังไม่ได้ผูกกับแอป (กด 'ผูกเพจกับแอป')"
+        : !(mine.subscribed_fields ?? []).includes("messages") ? "⚠️ ยังไม่ได้รับ field 'messages' (กด 'ผูกเพจกับแอป')"
         : "รับข้อความ Messenger ✓";
-      return { ok: true, msg: `เชื่อมต่อเพจ "${j.name}" สำเร็จ · ${sub}` };
+      return { ok: true, msg: `Page token ถูกต้อง (เพจ ID ${d.profile_id}) · ${sub}` };
     }
     case "instagram": {
       const fb = await getChannel("facebook", true);
