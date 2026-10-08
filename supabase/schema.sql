@@ -389,3 +389,8 @@ grant  execute on function public.is_staff()            to authenticated;
 grant  execute on function public.is_admin()            to authenticated;
 revoke execute on function public.staff_stats(timestamptz, timestamptz) from public, anon;
 grant  execute on function public.staff_stats(timestamptz, timestamptz) to authenticated;
+
+-- ---------- ข้อมูลพนักงานเพิ่มเติม ----------
+alter table public.staff add column if not exists position text;
+alter table public.staff add column if not exists phone text;
+grant update (display_name, role, active, position, phone) on public.staff to authenticated;
