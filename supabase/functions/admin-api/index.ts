@@ -133,7 +133,10 @@ Deno.serve(async (req) => {
           email, password, email_confirm: true, user_metadata: { name: name || email.split("@")[0] },
         });
         if (error) return json({ ok: false, msg: error.message }, 400);
-        if (role === "admin") await db.from("staff").update({ role: "admin" }).eq("id", data.user.id);
+        await db.from("staff").update({
+          role: role === "admin" ? "admin" : "agent",
+          position: b.position || null, phone: b.phone || null,
+        }).eq("id", data.user.id);
         await db.from("activity_log").insert({ actor: admin.id, action: `เพิ่มพนักงาน ${email}` });
         return json({ ok: true, msg: "เพิ่มพนักงานแล้ว" });
       }
