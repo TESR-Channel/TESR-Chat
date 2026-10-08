@@ -191,6 +191,14 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .switch input{width:18px;height:18px;accent-color:var(--brand)}
 .btnrow{display:flex;gap:8px;flex-wrap:wrap}
 .warnbox{background:var(--warnbg);border:1px solid var(--warnbd);color:var(--warnfg);border-radius:10px;padding:10px 12px;font-size:13px}
+#banners{position:fixed;top:calc(8px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:70;display:grid;gap:8px;width:min(420px,calc(100vw - 16px));pointer-events:none}
+.banner{pointer-events:auto;display:flex;gap:10px;align-items:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-left:4px solid var(--brand);
+  border-radius:14px;padding:10px 12px;box-shadow:0 12px 32px rgba(0,0,0,.25);cursor:pointer;animation:bin .25s ease-out;transition:opacity .25s,transform .25s}
+.banner.out{opacity:0;transform:translateY(-10px)}
+.banner .bt{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.banner .bb{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.banner .bx{border:0;background:none;color:var(--muted);font-size:14px;padding:4px}
+@keyframes bin{from{opacity:0;transform:translateY(-12px)}}
 .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-size:14px;z-index:50}
 
 /* ---------- รองรับทุกอุปกรณ์ (มือถือ / แท็บเล็ต / เดสก์ท็อป / ติดตั้งเป็นแอป) ---------- */
@@ -245,6 +253,8 @@ header nav button .ico{margin-right:4px}
     <div class="err" id="loginErr"></div>
   </form>
 </section>
+
+<div id="banners"></div>
 
 <!-- ========== APP ========== -->
 <section id="app" class="hidden">
@@ -684,7 +694,7 @@ $("list").onclick = (e) => { const it = e.target.closest(".item"); if (it) openC
 // ===================================================================
 async function openChat(id) {
   const c = S.contacts.find(x => x.id === id); if (!c) return;
-  S.current = c; S.msgs = null; clearAttach();
+  S.current = c; S.msgs = null; clearAttach(); clearNotifs(id);
   $("inboxView").classList.add("chatting");
   renderHead(); renderList();
   $("msgs").innerHTML = `<div class="empty">กำลังโหลด…</div>`;
@@ -1127,9 +1137,11 @@ function subscribe() {
 // มีข้อความเข้า: เล่นเสียงทุกครั้ง (ยกเว้นกำลังเปิดแชตนั้นอยู่จะเบาลงเป็นแค่ตัวเลข) +
 // ถ้าหน้าเว็บถูกย่อ/อยู่แท็บอื่น แสดงแจ้งเตือนเด้ง (ใช้ tag เดียวกับ Web Push จึงไม่เด้งซ้ำ)
 async function notify(m, viewing) {
+  if (viewing) clearNotifs(m.contact_id); // กำลังอ่านแชตนี้อยู่ ไม่ต้องค้างแจ้งเตือนไว้
   if (!NOTIF.on()) return;
   chime();
-  if (viewing || !document.hidden) { if (!viewing) toast(`💬 ${cname(S.contacts.find(x => x.id === m.contact_id))}: ${m.text || "ส่งไฟล์/รูป"}`); return; }
+  if (viewing) return;
+  if (!document.hidden) return banner(m);
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   const c = S.contacts.find(x => x.id === m.contact_id);
   try {
@@ -1140,8 +1152,33 @@ async function notify(m, viewing) {
   } catch (_) {}
 }
 document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && S.current) clearNotifs(S.current.id);
   if (!document.hidden && S.current?.unread) sb.from("contacts").update({ unread:0 }).eq("id", S.current.id);
 });
+// ปิดแจ้งเตือนของแชตที่เปิดอ่านแล้ว
+async function clearNotifs(contactId) {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    (await reg?.getNotifications({ tag:`tesr-${contactId}` }))?.forEach(n => n.close());
+  } catch (_) {}
+}
+// แถบแจ้งเตือนในแอป (ตอนเปิดแอปอยู่แต่ดูแชตอื่น) — กดเพื่อเปิดแชตนั้น
+function banner(m) {
+  const c = S.contacts.find(x => x.id === m.contact_id);
+  const media = { image:"📷 ส่งรูปภาพ", video:"🎬 ส่งวิดีโอ", audio:"🎤 ส่งข้อความเสียง", file:"📎 ส่งไฟล์", sticker:"😊 ส่งสติกเกอร์", location:"📍 ส่งตำแหน่ง" };
+  const who = (m.raw?.tesr_sender ? m.raw.tesr_sender + ": " : "");
+  const el = document.createElement("div");
+  el.className = "banner";
+  el.innerHTML = `${c ? avatar(c) : ""}<div style="min-width:0;flex:1">
+      <div class="bt"><span style="color:${CH[m.channel]?.color}">●</span> ${esc(CH[m.channel]?.name || "")} · ${esc(cname(c))}</div>
+      <div class="bb">${esc(who + (m.msg_type !== "text" ? media[m.msg_type] || "ส่งข้อความ" : m.text || ""))}</div></div>
+    <button class="bx" aria-label="ปิด">✕</button>`;
+  $("banners").prepend(el);
+  while ($("banners").children.length > 3) $("banners").lastChild.remove();
+  const close = () => { el.classList.add("out"); setTimeout(() => el.remove(), 250); };
+  el.onclick = (e) => { close(); if (!e.target.closest(".bx")) { $("inboxView").classList.remove("hidden"); document.querySelector('header nav button[data-view="inbox"]')?.click(); openChat(m.contact_id); } };
+  setTimeout(close, 8000);
+}
 
 // ===================================================================
 // VIEW SWITCH + DASHBOARD
