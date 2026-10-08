@@ -20,6 +20,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="guides.js"></script>
 <style>
 :root{
   --bg:#f4f5f7; --panel:#fff; --ink:#16181d; --muted:#6b7280; --line:#e5e7eb;
@@ -178,8 +179,9 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .pill{font-size:12px;padding:2px 9px;border-radius:999px;background:var(--bg);color:var(--muted);white-space:nowrap}
 .pill.ok{background:var(--okbg);color:var(--okfg)} .pill.bad{background:var(--badbg);color:var(--badfg)} .pill.soon{background:var(--soonbg);color:var(--soonfg)}
 .chbody{padding:0 16px 16px;display:grid;gap:14px;border-top:1px solid var(--line)}
-.steps{margin:12px 0 0;padding-left:20px;display:grid;gap:6px;font-size:14px}
-.steps code,.copybox code{background:var(--bg);padding:1px 6px;border-radius:5px;font-size:13px;word-break:break-all}
+.guidebox{margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
+.guidebox>summary{cursor:pointer;font-weight:700;font-size:15px}
+.copybox code{background:var(--bg);padding:1px 6px;border-radius:5px;font-size:13px;word-break:break-all}
 .copybox{display:flex;gap:8px;align-items:center;background:var(--bg);border-radius:10px;padding:8px 10px;font-size:13px}
 .copybox code{flex:1;background:none;padding:0}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
@@ -1244,16 +1246,6 @@ const SETUP = {
       { key:"basic_id", label:"Basic ID (ไม่บังคับ)", placeholder:"@tesr" },
     ],
     actions: [{ id:"line_set_webhook", label:"🔗 ตั้ง Webhook อัตโนมัติ" }],
-    steps: [
-      `เข้า <a href="https://manager.line.biz" target="_blank" rel="noopener">LINE OA Manager</a> > เลือก OA > <b>ตั้งค่า</b> > <b>Messaging API</b> > กด <b>เปิดใช้ Messaging API</b> (เลือก/สร้าง Provider ชื่อ TESR)`,
-      `เข้า <a href="https://developers.line.biz/console/" target="_blank" rel="noopener">LINE Developers Console</a> > เลือก Channel ของ OA`,
-      `แท็บ <b>Basic settings</b> คัดลอก <b>Channel secret</b> มาใส่ด้านล่าง`,
-      `แท็บ <b>Messaging API</b> เลื่อนลงล่างสุด กด <b>Issue</b> ที่ <b>Channel access token</b> แล้วคัดลอกมาใส่`,
-      `กด <b>บันทึก</b> แล้วกด <b>ตั้ง Webhook อัตโนมัติ</b> (หรือคัดลอก Webhook URL ไปวางเองในแท็บ Messaging API)`,
-      `ในแท็บ Messaging API เปิด <b>Use webhook</b> และปิด <b>Auto-reply messages</b>`,
-      `กด <b>ทดสอบการเชื่อมต่อ</b> แล้วลองทัก LINE OA จากมือถือ`,
-    ],
-    note: "ตอบภายใน ~1 นาทีหลังลูกค้าทัก = ไม่กินโควตา · ตอบช้ากว่านั้นระบบใช้ Push ซึ่งนับโควตาข้อความของแพ็กเกจ LINE OA",
   },
   facebook: {
     ready: true, webhook: "meta-webhook",
@@ -1261,39 +1253,19 @@ const SETUP = {
       { key:"app_id", label:"App ID", hint:"Meta App > App settings > Basic" },
       { key:"app_secret", label:"App secret", secret:true, hint:"Meta App > App settings > Basic > Show" },
       { key:"verify_token", label:"Verify token", gen:true, hint:"ตั้งเองได้ ใช้ตอนผูก Webhook (กด 🎲 เพื่อสุ่ม)" },
-      { key:"page_id", label:"Page ID", hint:"เพจ > เกี่ยวกับ > ความโปร่งใสของเพจ" },
-      { key:"page_access_token", label:"Page access token", secret:true, hint:"แนะนำแบบไม่หมดอายุ (System User token)" },
+      { key:"page_id", label:"Page ID", hint:"ตัวเลขใต้ชื่อเพจ ในหน้า Messenger API Settings (คู่มือข้อ 3)" },
+      { key:"page_access_token", label:"Page access token", secret:true, hint:"กด Generate ที่แถวเพจ (คู่มือข้อ 3)" },
       { key:"graph_version", label:"Graph API version", placeholder:"v23.0" },
     ],
     actions: [{ id:"fb_subscribe_page", label:"🔗 ผูกเพจกับแอป" }],
-    steps: [
-      `เข้า <a href="https://business.facebook.com/settings" target="_blank" rel="noopener">Meta Business Settings</a> ตรวจว่าเพจ TESR อยู่ใน Business Portfolio ของบริษัท แล้วทำ <b>Business Verification</b> (ใช้หนังสือรับรองบริษัท) — ใช้เวลาหลายวัน เริ่มก่อนได้เลย`,
-      `เข้า <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener">Meta for Developers</a> > <b>Create App</b> > เลือก use case <b>"Engage with customers on Messenger from Meta"</b> และผูกกับ Business Portfolio ของ TESR`,
-      `<b>App settings > Basic</b> คัดลอก <b>App ID</b> และ <b>App secret</b> มาใส่ด้านล่าง`,
-      `สร้าง Page access token: Business Settings > <b>System users</b> > Add (Admin) > <b>Assign assets</b> เลือกเพจ TESR (Full control) และแอปนี้ > <b>Generate token</b> ติ๊ก <code>pages_messaging</code>, <code>pages_manage_metadata</code>, <code>pages_show_list</code>, <code>pages_read_engagement</code> (ถ้าจะใช้ IG ติ๊ก <code>instagram_basic</code>, <code>instagram_manage_messages</code> ด้วย) แล้วคัดลอกมาใส่`,
-      `กด 🎲 สุ่ม Verify token แล้วกด <b>บันทึก</b>`,
-      `ในแอป: <b>Messenger > Messenger API Settings > Configure webhooks</b> ใส่ Callback URL ด้านล่าง + Verify token แล้วกด <b>Verify and save</b> จากนั้นติ๊ก field <code>messages</code>, <code>messaging_postbacks</code>`,
-      `กลับมากด <b>ผูกเพจกับแอป</b> และ <b>ทดสอบการเชื่อมต่อ</b>`,
-      `ก่อนใช้กับลูกค้าจริง: ส่ง <b>App Review</b> ขอ Advanced Access ของ <code>pages_messaging</code> และเปลี่ยนแอปเป็น <b>Live</b> (ระหว่างรอ ทดสอบได้กับบัญชีที่มี role ในแอป)`,
-    ],
-    note: "Meta ให้ตอบได้ภายใน 24 ชม. หลังลูกค้าทักล่าสุด · ข้อความที่ตอบจาก Meta Business Suite จะไม่ถูกบันทึกในระบบนี้",
   },
   instagram: {
     ready: true, webhook: "meta-webhook", sharedWith: "facebook",
     fields: [
-      { key:"ig_user_id", label:"Instagram account ID", hint:"Graph API Explorer: GET /{page-id}?fields=instagram_business_account" },
-      { key:"page_access_token", label:"Page access token (ไม่บังคับ)", secret:true, hint:"เว้นว่าง = ใช้ token เดียวกับ Facebook" },
+      { key:"ig_user_id", label:"Instagram account ID (เว้นว่างได้)", hint:"ระบบหาให้เองตอนกดทดสอบ" },
+      { key:"page_access_token", label:"Page access token", secret:true, hint:"Generate จากหน้า Instagram settings (คู่มือข้อ 5)" },
     ],
     actions: [],
-    steps: [
-      `ต้องตั้งค่า <b>Facebook</b> ให้เสร็จก่อน (ใช้ Meta App เดียวกัน)`,
-      `ในแอป Instagram ของ TESR: เปลี่ยนเป็น <b>บัญชีมืออาชีพ (Business)</b> และ <b>เชื่อมกับเพจ Facebook</b> ของ TESR`,
-      `ในแอป Instagram: <b>ตั้งค่า > ข้อความและการตอบกลับเรื่องราว > เครื่องมือการเชื่อมต่อ</b> > เปิด <b>อนุญาตการเข้าถึงข้อความ</b>`,
-      `หา Instagram account ID ด้วย <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener">Graph API Explorer</a>: <code>GET /{page-id}?fields=instagram_business_account</code> แล้วนำ <code>id</code> มาใส่`,
-      `ในแอป Meta: <b>Webhooks</b> > เลือก object <b>Instagram</b> > Subscribe ด้วย Callback URL + Verify token เดียวกับ Facebook > ติ๊ก field <code>messages</code>`,
-      `บันทึก แล้วกด <b>ทดสอบการเชื่อมต่อ</b> · ส่ง App Review ขอ <code>instagram_manage_messages</code> ก่อนใช้จริง`,
-    ],
-    note: "ส่งไฟล์ PDF ทาง IG ไม่ได้ ระบบจะส่งเป็นลิงก์แทน",
   },
   tiktok: {
     ready: false,
@@ -1303,13 +1275,6 @@ const SETUP = {
       { key:"business_id", label:"TikTok Business account ID" },
       { key:"access_token", label:"Access token", secret:true },
     ],
-    steps: [
-      `เปลี่ยนบัญชี TikTok ของ TESR เป็น <b>Business Account</b> และตั้งให้ <b>รับข้อความจากทุกคน</b>`,
-      `เชื่อมบัญชีกับ <a href="https://business.tiktok.com" target="_blank" rel="noopener">TikTok Business Center</a>`,
-      `สมัคร developer ที่ <a href="https://business-api.tiktok.com/portal" target="_blank" rel="noopener">TikTok API for Business</a> > สร้างแอป > ขอสิทธิ์ <b>Business Messaging</b>`,
-      `เมื่อได้รับอนุมัติ ใส่ค่าที่ได้ด้านล่างแล้วบันทึก (ตัวเชื่อมต่อจะเปิดในเฟสถัดไป)`,
-    ],
-    note: "TikTok ตอบได้ภายใน 48 ชม. และร้านทักลูกค้าก่อนไม่ได้",
   },
   youtube: {
     ready: false,
@@ -1317,12 +1282,6 @@ const SETUP = {
       { key:"api_key", label:"YouTube Data API key", secret:true },
       { key:"channel_id", label:"Channel ID", placeholder:"UCxxxxxxxx" },
       { key:"poll_minutes", label:"ดึงคอมเมนต์ทุกกี่นาที", placeholder:"15" },
-    ],
-    steps: [
-      `YouTube <b>ไม่มีระบบ DM</b> — ระบบจะดึง <b>คอมเมนต์</b> ใต้คลิปมาเป็นแชตแทน`,
-      `เข้า <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener">Google Cloud Console</a> > เปิดใช้ <b>YouTube Data API v3</b> > Credentials > <b>Create API key</b>`,
-      `หา Channel ID ที่ YouTube Studio > ตั้งค่า > ช่อง > ขั้นสูง`,
-      `ใส่ค่าแล้วบันทึก กดทดสอบได้ (ตัวดึงคอมเมนต์จะเปิดในเฟสถัดไป · การตอบคอมเมนต์ต้องใช้ OAuth เพิ่ม)`,
     ],
   },
   shopee: {
@@ -1334,11 +1293,6 @@ const SETUP = {
       { key:"access_token", label:"Access token", secret:true },
       { key:"refresh_token", label:"Refresh token", secret:true },
     ],
-    steps: [
-      `สมัคร <a href="https://open.shopee.com" target="_blank" rel="noopener">Shopee Open Platform</a> ในนามบริษัท (ประเภท Seller in-house system)`,
-      `สร้างแอปและขอสิทธิ์ <b>SellerChat API</b> (ต้องรอ Shopee อนุมัติ)`,
-      `Authorize ร้าน TESR Shop กับแอป แล้วนำค่าที่ได้มาใส่`,
-    ],
   },
   lazada: {
     ready: false,
@@ -1348,11 +1302,6 @@ const SETUP = {
       { key:"seller_id", label:"Seller ID" },
       { key:"access_token", label:"Access token", secret:true },
       { key:"refresh_token", label:"Refresh token", secret:true },
-    ],
-    steps: [
-      `สมัคร <a href="https://open.lazada.com" target="_blank" rel="noopener">Lazada Open Platform</a> > สร้างแอปประเภท <b>Seller In-house APP</b>`,
-      `ขอสิทธิ์ <b>IM (Instant Messaging) API</b> และรออนุมัติ`,
-      `Authorize ร้าน TESR แล้วนำค่าที่ได้มาใส่`,
     ],
   },
 };
@@ -1409,8 +1358,9 @@ async function renderChannels() {
           <div class="hint">${row.last_test_msg ? esc(row.last_test_msg) : (sp.ready ? "ยังไม่ได้ตั้งค่า" : "บันทึกค่าเตรียมไว้ได้")}</div></div>
         ${status}</summary>
       <div class="chbody">
-        <ol class="steps">${sp.steps.map(s => `<li>${s}</li>`).join("")}</ol>
-        ${sp.note ? `<div class="warnbox">${esc(sp.note)}</div>` : ""}
+        ${window.TESR_GUIDE?.has(row.channel) ? `<details class="guidebox"${row.last_test_ok ? "" : " open"}>
+          <summary>📘 คู่มือตั้งค่าทีละขั้น ${row.last_test_ok ? "<span class=\"hint\">(เชื่อมต่อแล้ว · กดเพื่อเปิดดู)</span>" : ""}</summary>
+          ${TESR_GUIDE.render(row.channel, { fn:FN })}</details>` : ""}
         ${hookUrl ? `<div class="field"><label>${row.channel === "line" ? "Webhook URL" : "Callback URL"}</label>
           <div class="copybox"><code>${esc(hookUrl)}</code><button type="button" class="btn ghost" style="padding:4px 10px" data-copy="${esc(hookUrl)}">คัดลอก</button></div></div>` : ""}
         <div class="fgrid">${fields}</div>
