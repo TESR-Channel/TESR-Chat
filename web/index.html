@@ -390,11 +390,13 @@ function toast(msg) {
   const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
   document.body.appendChild(t); setTimeout(() => t.remove(), 3200);
 }
+// ชื่อที่แสดง: ชื่อที่ทีมตั้งเอง (ถ้ามี) ไม่งั้นใช้ชื่อจากแพลตฟอร์ม
+const cname = (c) => (c?.custom_name || c?.display_name || "ลูกค้า");
 function avatar(c) {
   const ch = CH[c.channel] || { color:"#888", s:"?" };
   const img = c.avatar_url
     ? `<img class="ava" src="${safeUrl(c.avatar_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
-    : `<div class="ava" style="display:grid;place-items:center;font-weight:700;color:var(--muted)">${esc((c.display_name||"?").slice(0,1))}</div>`;
+    : `<div class="ava" style="display:grid;place-items:center;font-weight:700;color:var(--muted)">${esc(cname(c).slice(0,1))}</div>`;
   return `<div class="avawrap">${img}<span class="badge" style="background:${ch.color}" title="${ch.name}">${ch.s}</span></div>`;
 }
 
@@ -639,7 +641,7 @@ function filtered() {
     if (st === "mine" && c.assigned_to !== S.me.id) return false;
     if (st === "unassigned" && c.assigned_to) return false;
     if ((st === "open" || st === "closed") && c.status !== st) return false;
-    if (q && !`${c.display_name} ${c.last_text}`.toLowerCase().includes(q)) return false;
+    if (q && !`${c.custom_name || ""} ${c.display_name} ${c.last_text}`.toLowerCase().includes(q)) return false;
     return true;
   });
 }
@@ -661,7 +663,7 @@ function renderList() {
     return `<div class="item${S.current?.id === c.id ? " on" : ""}" data-id="${c.id}">
       ${avatar(c)}
       <div style="min-width:0">
-        <div class="nm">${esc(c.display_name)}</div>
+        <div class="nm">${esc(cname(c))}${c.custom_name ? ` <span style="font-weight:400;color:var(--muted);font-size:12px">(${esc(c.display_name)})</span>` : ""}</div>
         <div class="lt">${esc(c.last_text)}</div>
         <div style="margin-top:3px">${tags}</div>
       </div>
@@ -696,8 +698,8 @@ function renderHead() {
     <button class="back" id="backBtn2" aria-label="กลับ">‹</button>
     ${avatar(c)}
     <div style="min-width:0;flex:1">
-      <div class="nm">${esc(c.display_name)}</div>
-      <div class="sub"><span style="color:${ch.color};font-weight:600">● ${ch.name}</span>
+      <div class="nm">${esc(cname(c))}</div>
+      <div class="sub"><span style="color:${ch.color};font-weight:600">● ${ch.name}${c.platform_user_id?.startsWith("C") || c.platform_user_id?.startsWith("R") ? " · กลุ่ม" : ""}</span>${c.custom_name ? " · " + esc(c.display_name) : ""}
         ${c.business_unit ? " · " + esc(UNITS[c.business_unit]) : ""}
         ${c.assigned_to ? " · ผู้ดูแล: " + esc(S.staff[c.assigned_to]?.display_name || "") : ""}</div>
     </div>
@@ -726,7 +728,8 @@ function renderMsgs() {
     if (d !== lastDay) { html += `<div class="day">${d}</div>`; lastDay = d; }
     // ไฟล์ขาเข้าจาก LINE: text = ชื่อไฟล์ จึงไม่แสดงซ้ำ
     const showText = m.text && !(m.direction === "in" && m.msg_type === "file");
-    const body = (m.media_url ? mediaHtml(m) : "") + (showText ? `<div>${linkify(m.text)}</div>` : "");
+    const sender = m.direction === "in" && m.raw?.tesr_sender ? `<div style="font-size:12px;font-weight:600;color:var(--brand)">${esc(m.raw.tesr_sender)}</div>` : "";
+    const body = sender + (m.media_url ? mediaHtml(m) : "") + (showText ? `<div>${linkify(m.text)}</div>` : "");
     let meta = hhmm(m.created_at);
     if (m.direction === "out") {
       meta += ` · ${esc(S.staff[m.sent_by]?.display_name || "ระบบ")}`;
@@ -1011,8 +1014,13 @@ async function renderInfo() {
     <div style="display:flex;justify-content:space-between;align-items:center"><h3>ข้อมูลลูกค้า</h3>
       <button class="iconbtn" style="width:30px;height:30px;font-size:14px" onclick="$('infoCol').classList.add('closed')">✕</button></div>
     <div style="display:flex;gap:10px;align-items:center">${avatar(c)}
-      <div><div style="font-weight:600">${esc(c.display_name)}</div>
+      <div style="min-width:0"><div style="font-weight:600">${esc(cname(c))}</div>
+      <div class="log">ชื่อในแพลตฟอร์ม: ${esc(c.display_name)}</div>
       <div class="log">ทักครั้งแรก ${dayLabel(c.created_at)}</div></div></div>
+    <div class="field"><label>ตั้งชื่อเรียกในทีม (ลูกค้าไม่เห็น)</label>
+      <div style="display:flex;gap:6px"><input class="inp" id="cName" style="padding:8px 10px" value="${esc(c.custom_name || "")}" placeholder="${esc(c.display_name)}">
+      <button class="btn" id="cNameSave" style="padding:6px 12px">บันทึก</button></div>
+      <div class="hint">เว้นว่างแล้วบันทึก = กลับไปใช้ชื่อจากแพลตฟอร์ม</div></div>
     <div class="field"><label>ติดต่อเรื่อง (ฝ่าย)</label><select data-f="business_unit">${unitOpts}</select></div>
     <div class="field"><label>ผู้ดูแลลูกค้า</label><select data-f="assigned_to">${staffOpts}</select></div>
     <div class="field"><label>สถานะ</label><select data-f="status">${stOpts}</select></div>
@@ -1037,6 +1045,17 @@ async function renderInfo() {
     await sb.from("activity_log").insert({ contact_id:c.id, actor:S.me.id, action:label, detail:{ [f]:v } });
     toast("บันทึกแล้ว"); renderInfo();
   });
+  const saveName = async () => {
+    const v = $("cName").value.trim() || null;
+    if (v === (c.custom_name || null)) return;
+    const { error } = await sb.from("contacts").update({ custom_name:v }).eq("id", c.id);
+    if (error) return toast("บันทึกชื่อไม่สำเร็จ: " + error.message);
+    await sb.from("activity_log").insert({ contact_id:c.id, actor:S.me.id,
+      action: v ? `ตั้งชื่อเรียกเป็น "${v}"` : "ล้างชื่อเรียก (ใช้ชื่อจากแพลตฟอร์ม)", detail:{ custom_name:v } });
+    c.custom_name = v; toast("บันทึกชื่อแล้ว"); renderHead(); renderList(); renderInfo();
+  };
+  $("cNameSave").onclick = saveName;
+  $("cName").onkeydown = (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); saveName(); } };
   $("addNote").onclick = async () => {
     const body = $("noteText").value.trim(); if (!body) return;
     const { error } = await sb.from("notes").insert({ contact_id:c.id, author:S.me.id, body });
@@ -1076,13 +1095,13 @@ function subscribe() {
 async function notify(m, viewing) {
   if (!NOTIF.on()) return;
   chime();
-  if (viewing || !document.hidden) { if (!viewing) toast(`💬 ${S.contacts.find(x => x.id === m.contact_id)?.display_name || "ลูกค้า"}: ${m.text || "ส่งไฟล์/รูป"}`); return; }
+  if (viewing || !document.hidden) { if (!viewing) toast(`💬 ${cname(S.contacts.find(x => x.id === m.contact_id))}: ${m.text || "ส่งไฟล์/รูป"}`); return; }
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   const c = S.contacts.find(x => x.id === m.contact_id);
   try {
     const reg = await navigator.serviceWorker?.ready;
     const opts = { body:m.text || "ส่งไฟล์/รูป", tag:`tesr-${m.contact_id}`, icon:"icon.svg", badge:"icon.svg", data:{ contactId:m.contact_id } };
-    const title = `${CH[m.channel]?.name || ""} · ${c?.display_name || "ลูกค้า"}`;
+    const title = `${CH[m.channel]?.name || ""} · ${cname(c)}`;
     reg ? reg.showNotification(title, opts) : new Notification(title, opts);
   } catch (_) {}
 }
@@ -1159,14 +1178,14 @@ async function loadDash() {
 $("exportBtn").onclick = async () => {
   const { from, to } = rangeDates();
   const { data, error } = await sb.from("messages")
-    .select("created_at,channel,direction,msg_type,text,media_url,response_seconds,sent_by,contacts(display_name,business_unit)")
+    .select("created_at,channel,direction,msg_type,text,media_url,response_seconds,sent_by,contacts(display_name,custom_name,business_unit)")
     .gte("created_at", from).lt("created_at", to).order("created_at").limit(50000);
   if (error) return toast("Export ไม่สำเร็จ");
   const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const rows = [["เวลา","ช่องทาง","ลูกค้า","ฝ่าย","ทิศทาง","ประเภท","ข้อความ","ไฟล์","ผู้ตอบ","เวลาตอบ(วินาที)"]]
     .concat((data || []).map(m => [
       new Date(m.created_at).toLocaleString("th-TH"), CH[m.channel]?.name || m.channel,
-      m.contacts?.display_name, UNITS[m.contacts?.business_unit] || "",
+      cname(m.contacts), UNITS[m.contacts?.business_unit] || "",
       m.direction === "in" ? "ลูกค้า" : "ทีม", m.msg_type, m.text, m.media_url,
       S.staff[m.sent_by]?.display_name || "", m.response_seconds ?? "",
     ]));
@@ -1603,8 +1622,8 @@ function renderGeneral() {
   };
   $("bkContacts").onclick = async () => {
     const { data } = await sb.from("contacts").select("*").order("created_at");
-    downloadCsv("tesr-chat-contacts", [["ชื่อ","ช่องทาง","ID ในแพลตฟอร์ม","ฝ่าย","ผู้ดูแล","สถานะ","ทักครั้งแรก","ข้อความล่าสุด"]]
-      .concat((data || []).map(c => [c.display_name, CH[c.channel]?.name, c.platform_user_id, UNITS[c.business_unit] || "",
+    downloadCsv("tesr-chat-contacts", [["ชื่อเรียก","ชื่อในแพลตฟอร์ม","ช่องทาง","ID ในแพลตฟอร์ม","ฝ่าย","ผู้ดูแล","สถานะ","ทักครั้งแรก","ข้อความล่าสุด"]]
+      .concat((data || []).map(c => [c.custom_name || "", c.display_name, CH[c.channel]?.name, c.platform_user_id, UNITS[c.business_unit] || "",
         S.staff[c.assigned_to]?.display_name || "", c.status, new Date(c.created_at).toLocaleString("th-TH"),
         new Date(c.last_message_at).toLocaleString("th-TH")])));
   };
