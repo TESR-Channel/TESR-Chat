@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TESR Chat</title>
+<link rel="icon" id="favicon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e5322d'/%3E%3Ctext x='32' y='42' font-family='Arial,sans-serif' font-size='22' font-weight='800' fill='white' text-anchor='middle'%3ETESR%3C/text%3E%3C/svg%3E">
+<script>
+  // ตั้งธีมก่อนหน้าเว็บแสดง (กันจอกระพริบ): auto / light / dark
+  try { const t = localStorage.getItem("tesr-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (_) {}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="config.js"></script>
@@ -13,11 +18,32 @@
   --bg:#f4f5f7; --panel:#fff; --ink:#16181d; --muted:#6b7280; --line:#e5e7eb;
   --brand:#e5322d; --brand-ink:#fff; --bubble-in:#fff; --bubble-out:#16181d; --bubble-out-ink:#fff;
   --warn:#d97706; --bad:#dc2626; --ok:#16a34a; --sel:#fff1f0;
+  --okbg:#dcfce7; --okfg:#166534; --badbg:#fee2e2; --badfg:#991b1b; --soonbg:#fef3c7; --soonfg:#92400e;
+  --warnbg:#fffbeb; --warnbd:#fde68a; --warnfg:#92400e;
+  color-scheme:light;
 }
-@media (prefers-color-scheme:dark){:root{
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#0f1115; --panel:#171a20; --ink:#e8eaee; --muted:#9aa1ad; --line:#272b33;
   --bubble-in:#22262e; --bubble-out:#e5322d; --bubble-out-ink:#fff; --sel:#2a1716;
+  --okbg:#14532d; --okfg:#bbf7d0; --badbg:#7f1d1d; --badfg:#fecaca; --soonbg:#78350f; --soonfg:#fde68a;
+  --warnbg:#2a2110; --warnbd:#78350f; --warnfg:#fde68a;
+  color-scheme:dark;
 }}
+:root[data-theme="dark"]{
+  --bg:#0f1115; --panel:#171a20; --ink:#e8eaee; --muted:#9aa1ad; --line:#272b33;
+  --bubble-in:#22262e; --bubble-out:#e5322d; --bubble-out-ink:#fff; --sel:#2a1716;
+  --okbg:#14532d; --okfg:#bbf7d0; --badbg:#7f1d1d; --badfg:#fecaca; --soonbg:#78350f; --soonfg:#fde68a;
+  --warnbg:#2a2110; --warnbd:#78350f; --warnfg:#fde68a;
+  color-scheme:dark;
+}
+/* โลโก้ */
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:17px;white-space:nowrap}
+.brand .mark{height:30px;min-width:30px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:800;letter-spacing:.02em;padding:0 5px}
+.brand img.mark{background:transparent;padding:0;object-fit:contain;max-width:120px}
+.brand b{color:var(--brand)}
+#login .brand{font-size:22px;margin-bottom:4px}
+#login .brand .mark{height:44px;min-width:44px;font-size:14px;border-radius:12px}
+.themebtn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center;font-size:16px}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.45 "IBM Plex Sans Thai",system-ui,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -123,8 +149,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .chcard>summary::-webkit-details-marker{display:none}
 .chdot{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;flex:none}
 .pill{font-size:12px;padding:2px 9px;border-radius:999px;background:var(--bg);color:var(--muted);white-space:nowrap}
-.pill.ok{background:#dcfce7;color:#166534} .pill.bad{background:#fee2e2;color:#991b1b} .pill.soon{background:#fef3c7;color:#92400e}
-@media (prefers-color-scheme:dark){.pill.ok{background:#14532d;color:#bbf7d0}.pill.bad{background:#7f1d1d;color:#fecaca}.pill.soon{background:#78350f;color:#fde68a}}
+.pill.ok{background:var(--okbg);color:var(--okfg)} .pill.bad{background:var(--badbg);color:var(--badfg)} .pill.soon{background:var(--soonbg);color:var(--soonfg)}
 .chbody{padding:0 16px 16px;display:grid;gap:14px;border-top:1px solid var(--line)}
 .steps{margin:12px 0 0;padding-left:20px;display:grid;gap:6px;font-size:14px}
 .steps code,.copybox code{background:var(--bg);padding:1px 6px;border-radius:5px;font-size:13px;word-break:break-all}
@@ -136,8 +161,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .switch{display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer}
 .switch input{width:18px;height:18px;accent-color:var(--brand)}
 .btnrow{display:flex;gap:8px;flex-wrap:wrap}
-.warnbox{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 12px;font-size:13px}
-@media (prefers-color-scheme:dark){.warnbox{background:#2a2110;border-color:#78350f;color:#fde68a}}
+.warnbox{background:var(--warnbg);border:1px solid var(--warnbd);color:var(--warnfg);border-radius:10px;padding:10px 12px;font-size:13px}
 .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-size:14px;z-index:50}
 
 /* mobile */
@@ -161,7 +185,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 <!-- ========== LOGIN ========== -->
 <section id="login" class="hidden">
   <form id="loginForm">
-    <h1><b>TESR</b> Chat</h1>
+    <div class="brand" data-brand><span class="mark">TESR</span><span><b>TESR</b> Chat</span></div>
     <div style="color:var(--muted);font-size:13px;margin-bottom:6px">รวมแชตทุกช่องทาง สำหรับทีม TESR</div>
     <input class="inp" type="email" id="email" placeholder="อีเมล" required autocomplete="username">
     <input class="inp" type="password" id="pass" placeholder="รหัสผ่าน" required autocomplete="current-password">
@@ -173,20 +197,23 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 <!-- ========== APP ========== -->
 <section id="app" class="hidden">
   <header>
-    <div class="logo"><b>TESR</b> Chat</div>
+    <div class="brand" data-brand><span class="mark">TESR</span><span><b>TESR</b> Chat</span></div>
     <nav>
       <button data-view="inbox" class="on">กล่องแชต</button>
       <button data-view="dash">สถิติทีม</button>
       <button data-view="settings" id="navSettings" class="hidden">⚙ ตั้งค่า</button>
     </nav>
-    <div class="me"><span id="meName"></span><button class="btn ghost" id="logout" style="padding:5px 10px">ออก</button></div>
+    <div class="me"><span id="meName"></span>
+      <button class="themebtn" id="themeBtn" type="button" title="สลับธีม"></button>
+      <button class="btn ghost" id="logout" style="padding:5px 10px">ออก</button></div>
   </header>
 
   <!-- inbox -->
   <main class="inbox" id="inboxView">
     <div class="col" id="listCol">
       <div class="filters">
-        <input class="inp" id="q" placeholder="ค้นหาชื่อลูกค้า / ข้อความ" style="padding:8px 10px">
+        <input class="inp" id="q" type="search" name="tesr-chat-search" autocomplete="off" autocorrect="off"
+          spellcheck="false" data-lpignore="true" data-1p-ignore placeholder="ค้นหาชื่อลูกค้า / ข้อความ" style="padding:8px 10px">
         <div class="chips" id="chanChips"></div>
         <div class="row2">
           <select id="fUnit"><option value="">ทุกฝ่าย</option></select>
@@ -315,6 +342,37 @@ function avatar(c) {
 }
 
 // ===================================================================
+// THEME + BRAND
+// ===================================================================
+const THEMES = ["auto", "light", "dark"];
+const THEME_ICON = { auto:"🖥️", light:"☀️", dark:"🌙" };
+const THEME_NAME = { auto:"ตามระบบ", light:"สว่าง", dark:"มืด" };
+function getTheme() { try { return localStorage.getItem("tesr-theme") || "auto"; } catch (_) { return "auto"; } }
+function setTheme(t) {
+  if (t === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("tesr-theme", t); } catch (_) {}
+  $("themeBtn").textContent = THEME_ICON[t];
+  $("themeBtn").title = `ธีม: ${THEME_NAME[t]} (กดเพื่อสลับ)`;
+}
+$("themeBtn").onclick = () => {
+  const t = THEMES[(THEMES.indexOf(getTheme()) + 1) % THEMES.length];
+  setTheme(t); toast(`ธีม: ${THEME_NAME[t]}`);
+};
+setTheme(getTheme());
+
+// โลโก้: ใช้รูปที่แอดมินอัปโหลด (ตั้งค่า > ทั่วไป) ถ้าไม่มีใช้ตัวอักษร TESR
+function applyBrand(url) {
+  try { url ? localStorage.setItem("tesr-logo", url) : localStorage.removeItem("tesr-logo"); } catch (_) {}
+  document.querySelectorAll("[data-brand] .mark").forEach(el => {
+    const img = url ? Object.assign(document.createElement("img"), { src:url, alt:"TESR", className:"mark" }) : null;
+    if (img) el.replaceWith(img);
+    else if (el.tagName === "IMG") el.replaceWith(Object.assign(document.createElement("span"), { className:"mark", textContent:"TESR" }));
+  });
+  if (url) $("favicon").href = url;
+}
+try { const l = localStorage.getItem("tesr-logo"); if (l) applyBrand(l); } catch (_) {}
+
+// ===================================================================
 // AUTH
 // ===================================================================
 $("loginForm").onsubmit = async (e) => {
@@ -343,6 +401,10 @@ async function boot(user) {
   const { data: st } = await sb.from("app_settings").select("key,value");
   S.settings = Object.fromEntries((st || []).map(r => [r.key, r.value]));
   if (S.settings.slow_reply_min) SLOW = Number(S.settings.slow_reply_min) * 60;
+  applyBrand(S.settings.logo_url || null);
+  // กันเบราว์เซอร์กรอกอีเมลลงช่องค้นหาอัตโนมัติ (ทำให้รายการแชตว่าง)
+  const clearAutofill = () => { if ($("q").value.includes("@") || $("q").value === user.email) { $("q").value = ""; renderList(); } };
+  clearAutofill(); setTimeout(clearAutofill, 400); setTimeout(clearAutofill, 1500);
   $("meName").textContent = me.display_name;
   $("login").classList.add("hidden"); $("app").classList.remove("hidden");
   await loadStaff();
@@ -1019,6 +1081,23 @@ function renderGeneral() {
       <div><button class="btn" id="gSave">💾 บันทึก</button></div>
     </div>
     <div class="card" style="display:grid;gap:10px;max-width:520px;margin-top:14px">
+      <div style="font-weight:600">โลโก้บริษัท</div>
+      <div style="display:flex;gap:14px;align-items:center">
+        <div style="width:72px;height:72px;border:1px dashed var(--line);border-radius:12px;display:grid;place-items:center;overflow:hidden;background:var(--bg)">
+          ${st.logo_url ? `<img src="${safeUrl(st.logo_url)}" alt="โลโก้" style="max-width:100%;max-height:100%;object-fit:contain">`
+                        : `<span class="hint">ยังไม่มี</span>`}
+        </div>
+        <div style="display:grid;gap:6px">
+          <input type="file" id="gLogo" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden>
+          <div class="btnrow">
+            <button class="btn" id="gLogoBtn">⬆ อัปโหลดโลโก้</button>
+            ${st.logo_url ? `<button class="btn ghost" id="gLogoDel">ใช้แบบตัวอักษร</button>` : ""}
+          </div>
+          <div class="hint">PNG / SVG พื้นโปร่งใส แนะนำสี่เหลี่ยมจัตุรัส ไม่เกิน 1 MB · ใช้ที่หัวเว็บ หน้าล็อกอิน และไอคอนแท็บ</div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="display:grid;gap:10px;max-width:520px;margin-top:14px">
       <div style="font-weight:600">สำรองข้อมูล</div>
       <div class="hint">ไฟล์ CSV เปิดใน Excel หรือ Google Sheets ได้ (ไม่รวม token/secret เพื่อความปลอดภัย)</div>
       <div class="btnrow">
@@ -1026,6 +1105,27 @@ function renderGeneral() {
         <button class="btn ghost" id="bkContacts">⬇ รายชื่อลูกค้าทั้งหมด (CSV)</button>
       </div>
     </div>`;
+  const saveLogo = async (url) => {
+    const q = url
+      ? sb.from("app_settings").upsert({ key:"logo_url", value:url, updated_at:new Date().toISOString() })
+      : sb.from("app_settings").delete().eq("key", "logo_url");
+    const { error } = await q;
+    if (error) return toast("บันทึกโลโก้ไม่สำเร็จ: " + error.message);
+    if (url) S.settings.logo_url = url; else delete S.settings.logo_url;
+    applyBrand(url); toast("อัปเดตโลโก้แล้ว"); renderGeneral();
+  };
+  $("gLogoBtn").onclick = () => $("gLogo").click();
+  $("gLogo").onchange = async () => {
+    const f = $("gLogo").files[0]; if (!f) return;
+    if (f.size > 1024 * 1024) return toast("ไฟล์ใหญ่เกิน 1 MB");
+    const ext = (f.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const path = `brand/logo-${Date.now()}.${ext}`;
+    const { error } = await sb.storage.from("media").upload(path, f, { contentType:f.type || undefined });
+    if (error) return toast("อัปโหลดไม่สำเร็จ: " + error.message);
+    saveLogo(sb.storage.from("media").getPublicUrl(path).data.publicUrl);
+  };
+  if ($("gLogoDel")) $("gLogoDel").onclick = () => saveLogo(null);
+
   $("gSave").onclick = async () => {
     const rows = [{ key:"slow_reply_min", value:Number($("gSlow").value) || 10 }, { key:"company_name", value:$("gName").value.trim() }];
     const { error } = await sb.from("app_settings").upsert(rows.map(r => ({ ...r, updated_at:new Date().toISOString() })));
