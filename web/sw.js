@@ -1,6 +1,6 @@
 // TESR Chat — Service Worker
 // ทำให้ติดตั้งเป็นแอปได้ เปิดเร็วขึ้น และรับแจ้งเตือนข้อความใหม่ (Web Push) แม้ปิดแอปอยู่
-const CACHE = "tesr-chat-v2";
+const CACHE = "tesr-chat-v3";
 const SHELL = ["./", "./index.html", "./config.js", "./icon.svg", "./manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
@@ -33,10 +33,9 @@ self.addEventListener("fetch", (e) => {
 self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data?.text() }; }
+  // ต้องแสดงแจ้งเตือนทุกครั้งที่มี push — iPhone จะเลิกส่งแจ้งเตือนให้แอปถ้า push มาแล้วไม่แสดงอะไร
+  // (ถ้ากำลังเปิดแชตนั้นอยู่ หน้าแอปจะปิดแจ้งเตือนนั้นให้เอง)
   e.waitUntil((async () => {
-    const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    // ถ้ากำลังเปิดแอปอยู่หน้าจอ แอปจะเล่นเสียง/โชว์เองแล้ว ไม่ต้องเด้งซ้ำ
-    if (wins.some((w) => w.visibilityState === "visible" && w.focused)) return;
     await self.registration.showNotification(d.title || "TESR Chat", {
       body: d.body || "มีข้อความใหม่",
       tag: d.tag || "tesr-chat",
