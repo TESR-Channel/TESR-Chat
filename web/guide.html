@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>คู่มือตั้งค่าช่องทาง — TESR Chat</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<script>try { const t = localStorage.getItem("tesr-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (_) {}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<style>
+:root{--bg:#f4f5f7;--panel:#fff;--ink:#16181d;--muted:#6b7280;--line:#e5e7eb;--brand:#e5322d;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1115;--panel:#171a20;--ink:#e8eaee;--muted:#9aa1ad;--line:#272b33;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1115;--panel:#171a20;--ink:#e8eaee;--muted:#9aa1ad;--line:#272b33;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "IBM Plex Sans Thai",system-ui,sans-serif}
+main{max-width:900px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+h1{margin:0;font-size:22px} h1 b{color:var(--brand)}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.tab{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 14px;font:inherit;font-size:14px;cursor:pointer;color:inherit}
+.tab.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.print{margin-left:auto;border:0;background:var(--brand);color:#fff;border-radius:10px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+.chtitle{display:flex;gap:10px;align-items:center;margin-top:18px;font-size:19px;font-weight:700}
+.chdot{width:30px;height:30px;border-radius:8px;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:800}
+.hint{color:var(--muted);font-size:13px}
+@media print{ header .tabs,.print{display:none} body{background:#fff;color:#000} main{max-width:none;padding:0} }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1><b>TESR</b> Chat · คู่มือตั้งค่าช่องทาง</h1>
+    <button class="print" onclick="print()">🖨 พิมพ์ / บันทึก PDF</button>
+    <div class="hint" style="width:100%">ทำตามทีละขั้น ติ๊ก "ทำแล้ว" เพื่อจำความคืบหน้า (จำไว้ในเบราว์เซอร์นี้) · ค่าที่ต้องคัดลอกกดปุ่ม "คัดลอก" ได้เลย</div>
+  </header>
+  <nav class="tabs" id="tabs"></nav>
+  <div id="out"></div>
+</main>
+<script src="guides.js"></script>
+<script>
+  const NAMES = { line:["LINE OA","#06C755","L"], facebook:["Facebook","#1877F2","f"], instagram:["Instagram","#E4405F","IG"],
+    tiktok:["TikTok","#111111","T"], youtube:["YouTube","#FF0000","▶"], shopee:["Shopee","#EE4D2D","S"], lazada:["Lazada","#0F146D","Lz"] };
+  const FN = ((window.TESR_CONFIG || {}).SUPABASE_URL || "").replace(/\/$/, "") + "/functions/v1/";
+  const chans = TESR_GUIDE.channels;
+  function show(ch) {
+    if (!chans.includes(ch)) ch = chans[0];
+    document.getElementById("tabs").innerHTML = chans.map(c =>
+      `<button class="tab${c === ch ? " on" : ""}" data-c="${c}">${NAMES[c][0]}</button>`).join("");
+    const [n, col, s] = NAMES[ch];
+    document.getElementById("out").innerHTML =
+      `<div class="chtitle"><span class="chdot" style="background:${col}">${s}</span>ตั้งค่า ${n}</div>` +
+      TESR_GUIDE.render(ch, { fn: FN, full: true });
+    document.title = `คู่มือตั้งค่า ${n} — TESR Chat`;
+  }
+  document.getElementById("tabs").onclick = (e) => { const b = e.target.closest("[data-c]"); if (b) location.hash = b.dataset.c; };
+  addEventListener("hashchange", () => show(location.hash.slice(1)));
+  show(location.hash.slice(1));
+</script>
+</body>
+</html>
