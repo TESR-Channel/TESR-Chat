@@ -108,13 +108,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
 
-  const staff = await requireStaff(req);
-  if (!staff) return json({ error: "ไม่มีสิทธิ์ใช้งาน กรุณาเข้าสู่ระบบใหม่" }, 401);
-
   const p = (await req.json()) as Payload;
   if (!p.contact_id || (!p.text?.trim() && !p.media_url)) return json({ error: "ข้อมูลไม่ครบ" }, 400);
 
-  const { data: contact } = await db.from("contacts").select("*").eq("id", p.contact_id).single();
+  // ตรวจสิทธิ์และดึงข้อมูลลูกค้าพร้อมกัน (เร็วขึ้น)
+  const [staff, { data: contact }] = await Promise.all([
+    requireStaff(req),
+    db.from("contacts").select("*").eq("id", p.contact_id).maybeSingle(),
+  ]);
+  if (!staff) return json({ error: "ไม่มีสิทธิ์ใช้งาน กรุณาเข้าสู่ระบบใหม่" }, 401);
   if (!contact) return json({ error: "ไม่พบลูกค้า" }, 404);
 
   const msgType = p.media_url ? (p.media_kind ?? "file") : "text";
