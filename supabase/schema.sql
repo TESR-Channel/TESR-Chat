@@ -396,6 +396,9 @@ alter table public.staff add column if not exists position text;
 alter table public.staff add column if not exists phone text;
 grant update (display_name, role, active, position, phone) on public.staff to authenticated;
 
+-- ---------- ชื่อเรียกลูกค้าที่ทีมตั้งเอง (ชื่อจากแพลตฟอร์มยังเก็บไว้ใน display_name) ----------
+alter table public.contacts add column if not exists custom_name text;
+
 -- =====================================================================
 -- รหัสผ่านเริ่มต้น (แอดมินดูได้) + การแจ้งเตือน (Web Push)
 -- =====================================================================
