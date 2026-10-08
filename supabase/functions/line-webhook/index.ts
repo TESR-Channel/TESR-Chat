@@ -2,6 +2,7 @@
 // Webhook URL: https://<project-ref>.supabase.co/functions/v1/line-webhook
 // ค่าเชื่อมต่อตั้งจากหน้าเว็บ > ตั้งค่า > LINE OA
 import { db, getChannel, storeFromUrl, hmacSha256, safeEqual } from "../_shared/config.ts";
+import { notifyStaff } from "../_shared/push.ts";
 
 const profileCache = new Map<string, { name?: string; pic?: string }>();
 
@@ -58,12 +59,13 @@ async function handleEvent(ev: any, token: string) {
   }
 
   const prof = await getProfile(userId, token);
-  const { error } = await db.rpc("ingest_message", {
+  const { data: contactId, error } = await db.rpc("ingest_message", {
     p_channel: "line", p_uid: userId, p_name: prof.name ?? null, p_avatar: prof.pic ?? null,
     p_type: type, p_text: text, p_media: media, p_file_name: fileName,
     p_mid: m.id, p_raw: ev, p_reply_token: ev.replyToken ?? null,
   });
   if (error) console.error("ingest", error);
+  else if (contactId) await notifyStaff({ contactId, channel: "line", name: prof.name, text, type });
 }
 
 Deno.serve(async (req) => {
