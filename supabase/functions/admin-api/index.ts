@@ -35,15 +35,23 @@ async function testChannel(channel: string): Promise<Result> {
     }
     case "facebook": {
       const t = c.secrets.page_access_token, page = c.config.page_id;
-      if (!t || !page) return { ok: false, msg: "ยังใส่ Page ID / Page access token ไม่ครบ" };
+      if (!t) return { ok: false, msg: "ยังไม่ได้ใส่ Page access token" };
       if (!c.secrets.app_secret) return { ok: false, msg: "ยังไม่ได้ใส่ App secret" };
       if (!c.config.verify_token) return { ok: false, msg: "ยังไม่ได้ตั้ง Verify token" };
-      const r = await fetch(`${GRAPH(c)}/${page}?fields=name,id&access_token=${encodeURIComponent(t)}`);
+      // ใช้ /me ด้วย Page token (ไม่ต้องขอสิทธิ์ pages_read_engagement เพิ่ม)
+      const r = await fetch(`${GRAPH(c)}/me?fields=id,name&access_token=${encodeURIComponent(t)}`);
       const j = await r.json();
-      if (!r.ok) return { ok: false, msg: `Token ใช้ไม่ได้: ${j?.error?.message ?? r.status}` };
-      const s = await fetch(`${GRAPH(c)}/${page}/subscribed_apps?access_token=${encodeURIComponent(t)}`)
+      if (!r.ok) return { ok: false, msg: `Page access token ใช้ไม่ได้ (กด Generate ใหม่ใน Messenger API Settings): ${j?.error?.message ?? r.status}` };
+      if (page && j.id !== page) {
+        return { ok: false, msg: `Page ID ไม่ตรงกับ token — token นี้เป็นของเพจ "${j.name}" (ID ${j.id}) แก้ช่อง Page ID เป็น ${j.id}` };
+      }
+      const s = await fetch(`${GRAPH(c)}/me/subscribed_apps?access_token=${encodeURIComponent(t)}`)
         .then((x) => x.json()).catch(() => ({}));
-      const sub = (s?.data ?? []).length ? "เพจผูกกับแอปแล้ว ✓" : "⚠️ เพจยังไม่ได้ผูกกับแอป (กด 'ผูกเพจกับแอป')";
+      const mine = (s?.data ?? []).find((a: any) => !c.config.app_id || a.id === c.config.app_id) ?? (s?.data ?? [])[0];
+      const fields: string[] = mine?.subscribed_fields ?? [];
+      const sub = !mine ? "⚠️ เพจยังไม่ได้ผูกกับแอป (กด 'ผูกเพจกับแอป')"
+        : !fields.includes("messages") ? "⚠️ ยังไม่ได้รับ field 'messages' (กด 'ผูกเพจกับแอป')"
+        : "รับข้อความ Messenger ✓";
       return { ok: true, msg: `เชื่อมต่อเพจ "${j.name}" สำเร็จ · ${sub}` };
     }
     case "instagram": {
@@ -90,10 +98,10 @@ async function lineSetWebhook(): Promise<Result> {
 
 async function fbSubscribePage(): Promise<Result> {
   const c = await getChannel("facebook", true);
-  const t = c.secrets.page_access_token, page = c.config.page_id;
-  if (!t || !page) return { ok: false, msg: "ใส่ Page ID / Page access token แล้วบันทึกก่อน" };
+  const t = c.secrets.page_access_token;
+  if (!t) return { ok: false, msg: "ใส่ Page access token แล้วบันทึกก่อน" };
   const r = await fetch(
-    `${GRAPH(c)}/${page}/subscribed_apps?subscribed_fields=messages,messaging_postbacks&access_token=${encodeURIComponent(t)}`,
+    `${GRAPH(c)}/me/subscribed_apps?subscribed_fields=messages,messaging_postbacks&access_token=${encodeURIComponent(t)}`,
     { method: "POST" },
   );
   const j = await r.json();
