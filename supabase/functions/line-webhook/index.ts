@@ -22,10 +22,41 @@ async function getProfile(userId: string, token: string) {
   return {};
 }
 
+// แชตกลุ่ม / ห้องแชต: ใช้ชื่อกลุ่มเป็นชื่อแชต และเก็บชื่อคนพูดไว้ในข้อความ
+const groupCache = new Map<string, { name?: string; pic?: string }>();
+async function getGroup(src: any, token: string) {
+  const id = src.groupId ?? src.roomId;
+  if (groupCache.has(id)) return groupCache.get(id)!;
+  let v: { name?: string; pic?: string } = { name: src.type === "room" ? "ห้องแชต LINE" : undefined };
+  if (src.type === "group") {
+    try {
+      const r = await fetch(`https://api.line.me/v2/bot/group/${id}/summary`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) { const g = await r.json(); v = { name: g.groupName, pic: g.pictureUrl }; }
+    } catch (_) { /* ignore */ }
+  }
+  groupCache.set(id, v);
+  return v;
+}
+async function getMemberName(src: any, token: string): Promise<string | undefined> {
+  if (!src.userId) return undefined;
+  const base = src.type === "group" ? `group/${src.groupId}` : `room/${src.roomId}`;
+  try {
+    const r = await fetch(`https://api.line.me/v2/bot/${base}/member/${src.userId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (r.ok) return (await r.json()).displayName;
+  } catch (_) { /* ignore */ }
+  return undefined;
+}
+
 async function handleEvent(ev: any, token: string) {
   if (ev.type !== "message") return;
-  const userId: string | undefined = ev.source?.userId;
-  if (!userId) return;
+  const src = ev.source ?? {};
+  const isGroup = src.type === "group" || src.type === "room";
+  const chatId: string | undefined = isGroup ? (src.groupId ?? src.roomId) : src.userId;
+  if (!chatId) return;
 
   const m = ev.message;
   const content = (name?: string) => storeFromUrl(
@@ -58,14 +89,16 @@ async function handleEvent(ev: any, token: string) {
       type = "other"; text = `[${m.type}]`;
   }
 
-  const prof = await getProfile(userId, token);
+  const prof = isGroup ? await getGroup(src, token) : await getProfile(chatId, token);
+  const sender = isGroup ? (await getMemberName(src, token)) ?? "สมาชิกกลุ่ม" : undefined;
+  if (sender) ev.tesr_sender = sender; // หน้าเว็บแสดงชื่อคนพูดในกลุ่มจากค่านี้
   const { data: contactId, error } = await db.rpc("ingest_message", {
-    p_channel: "line", p_uid: userId, p_name: prof.name ?? null, p_avatar: prof.pic ?? null,
+    p_channel: "line", p_uid: chatId, p_name: prof.name ?? null, p_avatar: prof.pic ?? null,
     p_type: type, p_text: text, p_media: media, p_file_name: fileName,
     p_mid: m.id, p_raw: ev, p_reply_token: ev.replyToken ?? null,
   });
   if (error) console.error("ingest", error);
-  else if (contactId) await notifyStaff({ contactId, channel: "line", name: prof.name, text, type });
+  else if (contactId) await notifyStaff({ contactId, channel: "line", name: prof.name, text, type, sender });
 }
 
 Deno.serve(async (req) => {
