@@ -137,6 +137,8 @@ Deno.serve(async (req) => {
           role: role === "admin" ? "admin" : "agent",
           position: b.position || null, phone: b.phone || null,
         }).eq("id", data.user.id);
+        // เก็บรหัสเริ่มต้นให้แอดมินดูได้ (ถูกลบเมื่อพนักงานเปลี่ยนรหัสเอง)
+        await db.from("staff_initial_pw").upsert({ staff_id: data.user.id, password, set_by: admin.id, set_at: new Date().toISOString() });
         await db.from("activity_log").insert({ actor: admin.id, action: `เพิ่มพนักงาน ${email}` });
         return json({ ok: true, msg: "เพิ่มพนักงานแล้ว" });
       }
@@ -146,6 +148,7 @@ Deno.serve(async (req) => {
         }
         const { error } = await db.auth.admin.updateUserById(b.user_id, { password: b.password });
         if (error) return json({ ok: false, msg: error.message }, 400);
+        await db.from("staff_initial_pw").upsert({ staff_id: b.user_id, password: b.password, set_by: admin.id, set_at: new Date().toISOString() });
         await db.from("activity_log").insert({ actor: admin.id, action: "รีเซ็ตรหัสผ่านพนักงาน", detail: { user: b.user_id } });
         return json({ ok: true, msg: "เปลี่ยนรหัสผ่านแล้ว" });
       }
