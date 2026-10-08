@@ -9,6 +9,7 @@ type Payload = {
   media_url?: string;
   media_kind?: "image" | "video" | "audio" | "file";
   file_name?: string;
+  preview_url?: string; // หน้าปกวิดีโอ (jpg)
 };
 type Sender = (contact: any, p: Payload) => Promise<void>;
 
@@ -23,9 +24,13 @@ const sendLine: Sender = async (contact, p) => {
   const messages: any[] = [];
   if (p.media_url) {
     const isLineImage = p.media_kind === "image" && /\.(jpe?g|png)(\?|$)/i.test(p.media_url);
+    // วิดีโอ: LINE เล่นได้เฉพาะ .mp4 และต้องมีภาพหน้าปก
+    const isLineVideo = p.media_kind === "video" && !!p.preview_url && /\.mp4(\?|$)/i.test(p.media_url);
     messages.push(isLineImage
       ? { type: "image", originalContentUrl: p.media_url, previewImageUrl: p.media_url }
-      : { type: "text", text: fileLink(p) }); // LINE API ส่งไฟล์ตรง ๆ ไม่ได้ → ส่งลิงก์
+      : isLineVideo
+      ? { type: "video", originalContentUrl: p.media_url, previewImageUrl: p.preview_url }
+      : { type: "text", text: fileLink(p) }); // ไฟล์อื่น/วิดีโอ .mov .webm → ส่งเป็นลิงก์
   }
   if (p.text?.trim()) messages.push({ type: "text", text: p.text.slice(0, 5000) });
   if (!messages.length) throw new Error("ไม่มีข้อความ");
@@ -40,7 +45,7 @@ const sendLine: Sender = async (contact, p) => {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`, "Content-Type": "application/json",
-      "X-Line-Retry-Key": crypto.randomUUID(),
+      ...(useReply ? {} : { "X-Line-Retry-Key": crypto.randomUUID() }), // retry key ใช้ได้กับ push เท่านั้น
     },
     body: JSON.stringify(useReply
       ? { replyToken: contact.line_reply_token, messages }
