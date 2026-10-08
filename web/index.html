@@ -2,9 +2,16 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TESR Chat</title>
-<link rel="icon" id="favicon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e5322d'/%3E%3Ctext x='32' y='42' font-family='Arial,sans-serif' font-size='22' font-weight='800' fill='white' text-anchor='middle'%3ETESR%3C/text%3E%3C/svg%3E">
+<link rel="icon" id="favicon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="theme-color" content="#e5322d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TESR Chat">
 <script>
   // ตั้งธีมก่อนหน้าเว็บแสดง (กันจอกระพริบ): auto / light / dark
   try { const t = localStorage.getItem("tesr-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (_) {}
@@ -164,14 +171,36 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .warnbox{background:var(--warnbg);border:1px solid var(--warnbd);color:var(--warnfg);border-radius:10px;padding:10px 12px;font-size:13px}
 .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-size:14px;z-index:50}
 
-/* mobile */
+/* ---------- รองรับทุกอุปกรณ์ (มือถือ / แท็บเล็ต / เดสก์ท็อป / ติดตั้งเป็นแอป) ---------- */
+@supports (height:100dvh){ #app{height:100dvh} }
+header{padding-top:env(safe-area-inset-top);height:calc(52px + env(safe-area-inset-top))}
+#app{grid-template-rows:calc(52px + env(safe-area-inset-top)) 1fr}
+.composer{padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+header nav button .ico{margin-right:4px}
+.installbtn{display:none}
+.installbtn.show{display:inline-flex}
+@media (hover:none){ .item:hover{background:inherit} .item.on{background:var(--sel)} }
+
+/* tablet */
 @media (max-width:1000px){
   .inbox{grid-template-columns:300px 1fr}
   #infoCol{position:fixed;inset:52px 0 0 auto;width:min(320px,90vw);z-index:20;border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(0,0,0,.15)}
   #infoCol.closed{display:none}
 }
 @media (max-width:700px){
-  header nav{margin-left:4px} header .me span{display:none}
+  header{padding-left:10px;padding-right:10px;gap:6px}
+  header nav{margin-left:0;gap:2px}
+  header nav button{padding:6px 9px;font-size:18px}
+  header nav button .txt{display:none}
+  header nav button .ico{margin:0}
+  header .brand > span:not(.mark){display:none}
+  header .me{gap:6px} header .me span{display:none}
+  .themebtn{width:32px;height:32px}
+  #logout{padding:4px 8px!important;font-size:13px}
+  input,select,textarea{font-size:16px} /* กัน iOS ซูมเข้าเองตอนพิมพ์ */
+  .msg{max-width:88%}
+  .bub img.media{max-width:200px}
+  #infoCol{inset:calc(52px + env(safe-area-inset-top)) 0 0 0;width:100vw}
   .inbox{grid-template-columns:1fr}
   .inbox.chatting #listCol{display:none}
   .inbox:not(.chatting) #chatCol{display:none}
@@ -199,11 +228,13 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   <header>
     <div class="brand" data-brand><span class="mark">TESR</span><span><b>TESR</b> Chat</span></div>
     <nav>
-      <button data-view="inbox" class="on">กล่องแชต</button>
-      <button data-view="dash">สถิติทีม</button>
-      <button data-view="settings" id="navSettings" class="hidden">⚙ ตั้งค่า</button>
+      <button data-view="inbox" class="on" title="กล่องแชต"><span class="ico">💬</span><span class="txt">กล่องแชต</span></button>
+      <button data-view="dash" title="สถิติทีม"><span class="ico">📊</span><span class="txt">สถิติทีม</span></button>
+      <button data-view="settings" id="navSettings" class="hidden" title="ตั้งค่า"><span class="ico">⚙</span><span class="txt">ตั้งค่า</span></button>
     </nav>
     <div class="me"><span id="meName"></span>
+      <button class="themebtn installbtn" id="installBtn" type="button" title="ติดตั้งเป็นแอป">📲</button>
+      <button class="themebtn" id="pwBtn" type="button" title="เปลี่ยนรหัสผ่านของฉัน">🔑</button>
       <button class="themebtn" id="themeBtn" type="button" title="สลับธีม"></button>
       <button class="btn ghost" id="logout" style="padding:5px 10px">ออก</button></div>
   </header>
@@ -371,6 +402,31 @@ function applyBrand(url) {
   if (url) $("favicon").href = url;
 }
 try { const l = localStorage.getItem("tesr-logo"); if (l) applyBrand(l); } catch (_) {}
+
+// ===================================================================
+// WEB APP (ติดตั้งบนมือถือ / แท็บเล็ต / คอม)
+// ===================================================================
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+let installEvt = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault(); installEvt = e; $("installBtn").classList.add("show");
+});
+window.addEventListener("appinstalled", () => { installEvt = null; $("installBtn").classList.remove("show"); toast("ติดตั้งแอปแล้ว"); });
+$("installBtn").onclick = async () => {
+  if (!installEvt) return;
+  installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").classList.remove("show");
+};
+
+// เปลี่ยนรหัสผ่านของตัวเอง
+$("pwBtn").onclick = async () => {
+  const p1 = prompt("ตั้งรหัสผ่านใหม่ (อย่างน้อย 8 ตัว)"); if (!p1) return;
+  if (p1.length < 8) return toast("รหัสผ่านต้องมีอย่างน้อย 8 ตัว");
+  const p2 = prompt("พิมพ์รหัสผ่านใหม่อีกครั้ง"); if (p1 !== p2) return toast("รหัสผ่านไม่ตรงกัน");
+  const { error } = await sb.auth.updateUser({ password:p1 });
+  toast(error ? "เปลี่ยนไม่สำเร็จ: " + error.message : "เปลี่ยนรหัสผ่านแล้ว ✓");
+};
 
 // ===================================================================
 // AUTH
@@ -555,8 +611,11 @@ function renderMsgs() {
 // ---------- composer ----------
 const ta = $("text");
 ta.addEventListener("input", () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 140) + "px"; });
+// มือถือ/แท็บเล็ต: Enter = ขึ้นบรรทัด (กดปุ่ม "ส่ง") · คอม: Enter = ส่ง
+const TOUCH = matchMedia("(pointer:coarse)").matches;
+if (TOUCH) ta.placeholder = "พิมพ์ข้อความ…";
 ta.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("composer").requestSubmit(); }
+  if (!TOUCH && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("composer").requestSubmit(); }
 });
 $("attachBtn").onclick = () => $("file").click();
 $("file").onchange = () => {
@@ -1031,6 +1090,8 @@ async function renderStaffAdmin() {
       <div class="fgrid">
         <div class="field"><label>ชื่อที่แสดง</label><input id="nuName" class="inp" placeholder="เช่น แอน (Shop)"></div>
         <div class="field"><label>อีเมล (ใช้ล็อกอิน)</label><input id="nuEmail" class="inp" type="email"></div>
+        <div class="field"><label>ตำแหน่ง</label><input id="nuPos" class="inp" placeholder="เช่น วิศวกร"></div>
+        <div class="field"><label>เบอร์โทร</label><input id="nuPhone" class="inp" type="tel" placeholder="08x-xxx-xxxx"></div>
         <div class="field"><label>รหัสผ่านเริ่มต้น (≥ 8 ตัว)</label><input id="nuPass" class="inp" type="text" value="${rnd(5)}"></div>
         <div class="field"><label>สิทธิ์</label><select id="nuRole" class="inp"><option value="agent">พนักงาน</option><option value="admin">แอดมิน</option></select></div>
       </div>
@@ -1038,9 +1099,11 @@ async function renderStaffAdmin() {
       <div class="hint">ส่งอีเมลและรหัสผ่านให้พนักงานเอง ระบบไม่ส่งอีเมลให้</div>
     </div>
     <div style="overflow-x:auto;margin-top:14px"><table>
-      <tr><th>ชื่อ</th><th>อีเมล</th><th>สิทธิ์</th><th>ใช้งาน</th><th>เข้าใช้ล่าสุด</th><th></th></tr>
+      <tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>เบอร์โทร</th><th>อีเมล</th><th>สิทธิ์</th><th>ใช้งาน</th><th>เข้าใช้ล่าสุด</th><th></th></tr>
       ${(staff || []).map(s => `<tr data-id="${s.id}">
-        <td><input class="inp" data-f="display_name" value="${esc(s.display_name)}" style="padding:5px 8px;min-width:120px"></td>
+        <td><input class="inp" data-f="display_name" value="${esc(s.display_name)}" style="padding:5px 8px;min-width:140px"></td>
+        <td><input class="inp" data-f="position" value="${esc(s.position || "")}" style="padding:5px 8px;min-width:100px"></td>
+        <td><input class="inp" data-f="phone" type="tel" value="${esc(s.phone || "")}" style="padding:5px 8px;min-width:110px"></td>
         <td style="font-size:13px">${esc(emails[s.id]?.email || "")}</td>
         <td><select class="inp" data-f="role" style="padding:5px 8px"><option value="agent"${s.role === "agent" ? " selected" : ""}>พนักงาน</option><option value="admin"${s.role === "admin" ? " selected" : ""}>แอดมิน</option></select></td>
         <td><input type="checkbox" data-f="active"${s.active ? " checked" : ""} style="width:18px;height:18px;accent-color:var(--brand)"></td>
@@ -1051,7 +1114,7 @@ async function renderStaffAdmin() {
 
   $("nuAdd").onclick = async () => {
     const r = await adminApi({ action:"create_user", name:$("nuName").value.trim(), email:$("nuEmail").value.trim(),
-      password:$("nuPass").value, role:$("nuRole").value });
+      password:$("nuPass").value, role:$("nuRole").value, position:$("nuPos").value.trim(), phone:$("nuPhone").value.trim() });
     toast(r?.msg || "เสร็จ");
     if (r?.ok) { await loadStaff(); renderStaffAdmin(); }
   };
