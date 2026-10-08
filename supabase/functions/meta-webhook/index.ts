@@ -4,6 +4,7 @@
 import {
   db, getChannel, storeFromUrl, hmacSha256, safeEqual, GRAPH, ChannelConfig,
 } from "../_shared/config.ts";
+import { notifyStaff } from "../_shared/push.ts";
 
 const toHex = (b: Uint8Array) => [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
 const profileCache = new Map<string, { name?: string; pic?: string }>();
@@ -53,12 +54,13 @@ async function handleMessaging(kind: "facebook" | "instagram", ev: any, fb: Chan
   if (!text && !media) text = "[ข้อความที่ระบบยังไม่รองรับ]";
 
   const prof = await getProfile(kind, uid, fb, token);
-  const { error } = await db.rpc("ingest_message", {
+  const { data: contactId, error } = await db.rpc("ingest_message", {
     p_channel: kind, p_uid: uid, p_name: prof.name ?? null, p_avatar: prof.pic ?? null,
     p_type: type, p_text: text, p_media: media, p_file_name: fileName,
     p_mid: msg.mid ?? null, p_raw: ev, p_reply_token: null,
   });
   if (error) console.error("ingest", error);
+  else if (contactId) await notifyStaff({ contactId, channel: kind, name: prof.name, text, type });
 }
 
 Deno.serve(async (req) => {
