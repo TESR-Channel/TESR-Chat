@@ -13,3 +13,7 @@ verify_jwt = true
 
 [functions.admin-api]
 verify_jwt = true
+
+# เรียกจาก pg_cron ทุก 1 นาที (ตรวจด้วย x-sync-key จากตาราง app_secrets แทน JWT)
+[functions.meta-sync]
+verify_jwt = false
