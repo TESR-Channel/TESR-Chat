@@ -445,6 +445,8 @@ function applyBrand(url) {
   if (url) $("favicon").href = url;
 }
 try { const l = localStorage.getItem("tesr-logo"); if (l) applyBrand(l); } catch (_) {}
+// หน้าล็อกอิน: ดึงโลโก้จริงของบริษัทมาแสดงตั้งแต่ก่อนเข้าระบบ (เครื่องใหม่/ติดตั้งแอปใหม่ก็เห็นโลโก้)
+sb.rpc("public_logo").then(({ data }) => { if (data && typeof data === "string") applyBrand(data); }).catch(() => {});
 
 // ===================================================================
 // WEB APP (ติดตั้งบนมือถือ / แท็บเล็ต / คอม)
