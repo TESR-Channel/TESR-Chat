@@ -63,13 +63,33 @@ async function testChannel(channel: string): Promise<Result> {
     }
     case "instagram": {
       const fb = await getChannel("facebook", true);
-      const t = c.secrets.page_access_token || fb.secrets.page_access_token, ig = c.config.ig_user_id;
-      if (!ig) return { ok: false, msg: "ยังไม่ได้ใส่ Instagram account ID" };
-      if (!t) return { ok: false, msg: "ยังไม่มี Page access token (ตั้งที่ Facebook ก่อน)" };
-      const r = await fetch(`${GRAPH(fb)}/${ig}?fields=username,name&access_token=${encodeURIComponent(t)}`);
-      const j = await r.json();
-      if (!r.ok) return { ok: false, msg: `เชื่อมไม่ได้: ${j?.error?.message ?? r.status}` };
-      return { ok: true, msg: `เชื่อมต่อ @${j.username} สำเร็จ` };
+      const t = c.secrets.page_access_token || fb.secrets.page_access_token;
+      const app = fb.config.app_id, sec = fb.secrets.app_secret;
+      let ig = c.config.ig_user_id;
+      if (!t) return { ok: false, msg: "ยังไม่มี Page access token (ตั้งที่ Facebook ก่อน หรือใส่ token จากหน้า Instagram settings)" };
+      // 1) token มีสิทธิ์ Instagram ครบไหม (ตรวจด้วย App token ไม่ต้องขอสิทธิ์เพิ่ม)
+      if (app && sec) {
+        const d = await fetch(`${GRAPH(fb)}/debug_token?input_token=${encodeURIComponent(t)}` +
+          `&access_token=${encodeURIComponent(`${app}|${sec}`)}`).then((x) => x.json()).then((j) => j.data ?? {}).catch(() => ({}));
+        if (d.is_valid === false) return { ok: false, msg: `token ใช้ไม่ได้ (Generate ใหม่): ${d.error?.message ?? ""}` };
+        const need = ["instagram_basic", "instagram_manage_messages"].filter((x) => !(d.scopes ?? []).includes(x));
+        if (d.scopes && need.length) {
+          return { ok: false, msg: `token ยังไม่มีสิทธิ์ ${need.join(", ")} — เพิ่มสิทธิ์ในแอป แล้วไปที่ Messenger > Instagram settings กด Generate token ใหม่ นำมาใส่ช่อง Page access token ของ Instagram` };
+        }
+      }
+      // 2) หา Instagram account ID ให้อัตโนมัติ (ถ้ายังไม่ได้ใส่)
+      if (!ig) {
+        const j = await fetch(`${GRAPH(fb)}/me?fields=instagram_business_account&access_token=${encodeURIComponent(t)}`)
+          .then((x) => x.json()).catch(() => ({}));
+        ig = j?.instagram_business_account?.id;
+        if (!ig) return { ok: false, msg: "หา Instagram account ID ไม่เจอ — เช็กว่า IG เป็นบัญชีมืออาชีพและเชื่อมกับเพจ TESR แล้ว หรือคัดลอก ID จากหน้า Instagram settings มาใส่เอง" };
+        await db.from("channel_configs").update({ config: { ...c.config, ig_user_id: ig } }).eq("channel", "instagram");
+      }
+      const r = await fetch(`${GRAPH(fb)}/${ig}?fields=username&access_token=${encodeURIComponent(t)}`);
+      const j = await r.json().catch(() => ({}));
+      return r.ok
+        ? { ok: true, msg: `เชื่อมต่อ @${j.username} สำเร็จ (IG ID ${ig})` }
+        : { ok: true, msg: `token มีสิทธิ์ Instagram ครบ (IG ID ${ig}) · ทักทาง IG มาทดสอบได้เลย` };
     }
     case "youtube": {
       const k = c.secrets.api_key, ch = c.config.channel_id;
