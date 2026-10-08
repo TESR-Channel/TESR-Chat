@@ -97,15 +97,25 @@ export const cors = {
 export const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
+// อ่าน user id จาก JWT — ใช้ได้เฉพาะฟังก์ชันที่ตั้ง verify_jwt = true
+// (Supabase ตรวจลายเซ็น token ให้แล้วก่อนเข้าฟังก์ชัน จึงไม่ต้องเรียก Auth ซ้ำ ทำให้เร็วขึ้น)
+function jwtSub(jwt: string): string | null {
+  try {
+    const b = jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const p = JSON.parse(atob(b + "=".repeat((4 - b.length % 4) % 4)));
+    return p.sub && p.exp * 1000 > Date.now() ? p.sub : null;
+  } catch (_) { return null; }
+}
+
 // ตรวจว่าผู้เรียกเป็นพนักงาน (และเป็นแอดมินถ้าต้องการ)
 export async function requireStaff(req: Request, adminOnly = false) {
   const auth = req.headers.get("Authorization") ?? "";
   const jwt = auth.replace(/^Bearer\s+/i, "");
   if (!jwt) return null;
-  const { data: { user } } = await db.auth.getUser(jwt);
-  if (!user) return null;
+  const uid = jwtSub(jwt);
+  if (!uid) return null;
   const { data: staff } = await db.from("staff").select("id, role, active, display_name")
-    .eq("id", user.id).maybeSingle();
+    .eq("id", uid).maybeSingle();
   if (!staff?.active) return null;
   if (adminOnly && staff.role !== "admin") return null;
   return staff as { id: string; role: string; active: boolean; display_name: string };
