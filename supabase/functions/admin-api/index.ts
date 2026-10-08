@@ -52,13 +52,22 @@ async function testChannel(channel: string): Promise<Result> {
       }
       const scopes: string[] = d.scopes ?? [];
       if (!scopes.includes("pages_messaging")) return { ok: false, msg: "token ไม่มีสิทธิ์ pages_messaging — Generate ใหม่และกดอนุญาตทุกข้อ" };
-      const s = await fetch(`${GRAPH(c)}/me/subscribed_apps?access_token=${encodeURIComponent(t)}`)
-        .then((x) => x.json()).catch(() => ({}));
-      const mine = (s?.data ?? []).find((a: any) => String(a.id) === String(app));
-      const sub = s?.error ? "(เช็กการผูกเพจไม่ได้ ดูที่ Messenger API Settings แทน)"
-        : !mine ? "⚠️ เพจยังไม่ได้ผูกกับแอป (กด 'ผูกเพจกับแอป')"
-        : !(mine.subscribed_fields ?? []).includes("messages") ? "⚠️ ยังไม่ได้รับ field 'messages' (กด 'ผูกเพจกับแอป')"
-        : "รับข้อความ Messenger ✓";
+      // เพจต้องส่ง field "messages" ให้แอป ไม่งั้น Meta จะไม่ส่งข้อความมาเลย (เจอจริง: ผูกไว้แค่ field "name")
+      // ถ้ายังไม่ได้ผูก ระบบผูกให้อัตโนมัติ
+      const subOk = async () => {
+        const s = await fetch(`${GRAPH(c)}/me/subscribed_apps?access_token=${encodeURIComponent(t)}`)
+          .then((x) => x.json()).catch(() => ({}));
+        if (s?.error) return null;
+        const mine = (s?.data ?? []).find((a: any) => String(a.id) === String(app));
+        return !!mine && (mine.subscribed_fields ?? []).includes("messages");
+      };
+      let ok = await subOk(), fixed = false;
+      if (ok === false) { fixed = (await fbSubscribePage()).ok; ok = fixed ? await subOk() : false; }
+      if (ok === false) {
+        return { ok: false, msg: `Page token ถูกต้อง แต่เพจยังไม่ส่งข้อความให้แอป และผูกอัตโนมัติไม่สำเร็จ — ไปที่ Messenger API Settings › แถวเพจ › Webhook Subscription ติ๊ก messages` };
+      }
+      const sub = ok === null ? "(เช็กการผูกเพจไม่ได้ ดูที่ Messenger API Settings แทน)"
+        : fixed ? "ผูกเพจให้รับข้อความอัตโนมัติแล้ว ✓" : "รับข้อความ Messenger ✓";
       return { ok: true, msg: `Page token ถูกต้อง (เพจ ID ${d.profile_id}) · ${sub}` };
     }
     case "instagram": {
@@ -84,6 +93,12 @@ async function testChannel(channel: string): Promise<Result> {
         ig = j?.instagram_business_account?.id;
         if (!ig) return { ok: false, msg: "หา Instagram account ID ไม่เจอ — เช็กว่า IG เป็นบัญชีมืออาชีพและเชื่อมกับเพจ TESR แล้ว หรือคัดลอก ID จากหน้า Instagram settings มาใส่เอง" };
         await db.from("channel_configs").update({ config: { ...c.config, ig_user_id: ig } }).eq("channel", "instagram");
+      }
+      // 3) เพจต้องส่ง field "messages" ให้แอป (DM ของ IG ก็ผ่านเส้นทางนี้) — ถ้ายังไม่ผูก ผูกให้อัตโนมัติ
+      const sa = await fetch(`${GRAPH(fb)}/me/subscribed_apps?access_token=${encodeURIComponent(t)}`).then((x) => x.json()).catch(() => ({}));
+      const mine = (sa?.data ?? []).find((a: any) => String(a.id) === String(app));
+      if (!sa?.error && !(mine?.subscribed_fields ?? []).includes("messages")) {
+        await fetch(`${GRAPH(fb)}/me/subscribed_apps?subscribed_fields=messages,messaging_postbacks&access_token=${encodeURIComponent(t)}`, { method: "POST" }).catch(() => null);
       }
       const r = await fetch(`${GRAPH(fb)}/${ig}?fields=username&access_token=${encodeURIComponent(t)}`);
       const j = await r.json().catch(() => ({}));
