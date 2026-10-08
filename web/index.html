@@ -125,9 +125,27 @@ header .me{margin-left:auto;display:flex;gap:10px;align-items:center;color:var(-
 .mt .slow{color:var(--bad);font-weight:600}
 .empty{margin:auto;color:var(--muted);text-align:center}
 .composer{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line);align-items:flex-end}
-.composer textarea{flex:1;resize:none;max-height:140px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.composer textarea{flex:1;min-width:0;width:0;resize:none;max-height:140px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
 .iconbtn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-size:18px;display:grid;place-items:center}
-.attach{padding:6px 12px;font-size:13px;color:var(--muted);border-top:1px solid var(--line)}
+.attach{padding:6px 12px;font-size:13px;color:var(--muted);border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}
+@media (max-width:420px){header nav button{padding:6px 6px!important;font-size:16px!important} header .me{gap:4px!important} header .me .themebtn{width:30px!important;height:30px!important;font-size:14px!important}
+.composer{gap:6px;padding:8px}.composer .iconbtn{width:36px;height:36px;font-size:16px}}
+.attach .thumb{width:54px;height:54px;border-radius:8px;object-fit:cover;background:#000}
+.composer{position:relative;min-width:0}
+#chatCol{min-width:0}
+.pop{position:absolute;bottom:calc(100% + 6px);left:10px;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,.18);padding:6px;display:grid;gap:2px;min-width:230px;max-width:min(420px,calc(100vw - 20px));max-height:300px;overflow-y:auto}
+.pop button{all:unset;cursor:pointer;padding:9px 12px;border-radius:8px;font-size:14px;white-space:pre-wrap;word-break:break-word}
+.pop button:hover,.pop button.on{background:var(--bg)}
+.pop .ph{font-size:12px;color:var(--muted);padding:4px 12px}
+.cam{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.92);display:grid;grid-template-rows:1fr auto;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.cam video{width:100%;height:100%;object-fit:contain;background:#000}
+.cam .bar{display:flex;gap:14px;justify-content:center;align-items:center;padding:16px;flex-wrap:wrap}
+.cam .bar button{border:0;border-radius:999px;padding:12px 18px;font-size:16px;background:#fff;color:#111;cursor:pointer}
+.cam .bar .rec{background:var(--brand);color:#fff}
+.cam .timer{position:absolute;top:calc(14px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);color:#fff;background:rgba(229,50,45,.9);padding:4px 12px;border-radius:999px;font-variant-numeric:tabular-nums}
+.qr-row{display:flex;gap:8px;align-items:flex-start}
+.qr-row textarea{flex:1;min-height:42px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);resize:vertical}
 
 /* info */
 .info{overflow-y:auto;padding:14px;display:grid;gap:14px;align-content:start}
@@ -195,7 +213,8 @@ header nav button .ico{margin-right:4px}
   header nav button .ico{margin:0}
   header .brand > span:not(.mark){display:none}
   header .me{gap:6px} header .me span{display:none}
-  .themebtn{width:32px;height:32px}
+  header .me{min-width:0;flex-shrink:1}
+  .themebtn{width:32px;height:32px;font-size:15px}
   #logout{padding:4px 8px!important;font-size:13px}
   input,select,textarea{font-size:16px} /* กัน iOS ซูมเข้าเองตอนพิมพ์ */
   .msg{max-width:88%}
@@ -234,6 +253,7 @@ header nav button .ico{margin-right:4px}
     </nav>
     <div class="me"><span id="meName"></span>
       <button class="themebtn installbtn" id="installBtn" type="button" title="ติดตั้งเป็นแอป">📲</button>
+      <button class="themebtn" id="bellBtn" type="button" title="การแจ้งเตือน">🔔</button>
       <button class="themebtn" id="pwBtn" type="button" title="เปลี่ยนรหัสผ่านของฉัน">🔑</button>
       <button class="themebtn" id="themeBtn" type="button" title="สลับธีม"></button>
       <button class="btn ghost" id="logout" style="padding:5px 10px">ออก</button></div>
@@ -270,7 +290,12 @@ header nav button .ico{margin-right:4px}
       <div class="attach hidden" id="attachBar"></div>
       <form class="composer" id="composer">
         <input type="file" id="file" hidden>
+        <input type="file" id="camPhoto" accept="image/*" capture="environment" hidden>
+        <input type="file" id="camVideo" accept="video/*" capture="environment" hidden>
         <button type="button" class="iconbtn" id="attachBtn" title="แนบรูป/ไฟล์">📎</button>
+        <button type="button" class="iconbtn" id="camBtn" title="ถ่ายรูป / อัดวิดีโอสั้น">📷</button>
+        <button type="button" class="iconbtn" id="qrBtn" title="ข้อความลัด (หรือพิมพ์ / )">⚡</button>
+        <div class="pop hidden" id="pop"></div>
         <textarea id="text" rows="1" placeholder="พิมพ์ข้อความ… (Enter ส่ง, Shift+Enter ขึ้นบรรทัด)"></textarea>
         <button class="btn" id="sendBtn" type="submit">ส่ง</button>
       </form>
@@ -304,6 +329,7 @@ header nav button .ico{margin-right:4px}
       <div class="chips" id="setTabs" style="margin-left:auto">
         <button class="chip on" data-t="channels">ช่องทาง</button>
         <button class="chip" data-t="staff">พนักงาน</button>
+        <button class="chip" data-t="quick">ข้อความลัด</button>
         <button class="chip" data-t="general">ทั่วไป</button>
       </div>
     </div>
@@ -376,7 +402,7 @@ function avatar(c) {
 // THEME + BRAND
 // ===================================================================
 const THEMES = ["auto", "light", "dark"];
-const THEME_ICON = { auto:"🖥️", light:"☀️", dark:"🌙" };
+const THEME_ICON = { auto:"\u{1F5A5}️", light:"☀️", dark:"🌙" };
 const THEME_NAME = { auto:"ตามระบบ", light:"สว่าง", dark:"มืด" };
 function getTheme() { try { return localStorage.getItem("tesr-theme") || "auto"; } catch (_) { return "auto"; } }
 function setTheme(t) {
@@ -425,8 +451,110 @@ $("pwBtn").onclick = async () => {
   if (p1.length < 8) return toast("รหัสผ่านต้องมีอย่างน้อย 8 ตัว");
   const p2 = prompt("พิมพ์รหัสผ่านใหม่อีกครั้ง"); if (p1 !== p2) return toast("รหัสผ่านไม่ตรงกัน");
   const { error } = await sb.auth.updateUser({ password:p1 });
-  toast(error ? "เปลี่ยนไม่สำเร็จ: " + error.message : "เปลี่ยนรหัสผ่านแล้ว ✓");
+  if (error) return toast("เปลี่ยนไม่สำเร็จ: " + error.message);
+  await sb.rpc("clear_my_initial_password"); // ลบรหัสชั่วคราวที่แอดมินเห็นทิ้ง
+  toast("เปลี่ยนรหัสผ่านแล้ว ✓");
 };
+
+// ===================================================================
+// แจ้งเตือน: เสียง + ป้ายตัวเลข + แจ้งเตือนเด้ง (Web Push ทำงานแม้ปิดแอป)
+// ===================================================================
+const NOTIF = {
+  on() { try { return localStorage.getItem("tesr-notif") !== "off"; } catch (_) { return true; } },
+  set(v) { try { localStorage.setItem("tesr-notif", v ? "on" : "off"); } catch (_) {} },
+};
+let audioCtx = null, lastChime = 0;
+const unlockAudio = () => {
+  try {
+    audioCtx ??= new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch (_) {}
+};
+["pointerdown", "keydown", "touchstart"].forEach(ev => document.addEventListener(ev, unlockAudio, { passive:true }));
+
+// เสียง "ติ๊ง-ต่อง" สร้างด้วย Web Audio (ไม่ต้องโหลดไฟล์เสียง)
+function chime() {
+  if (!NOTIF.on() || !audioCtx || Date.now() - lastChime < 1200) return;
+  lastChime = Date.now();
+  const t = audioCtx.currentTime;
+  [[987.8, 0], [1318.5, 0.13]].forEach(([f, d]) => {
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = "sine"; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t + d);
+    g.gain.exponentialRampToValueAtTime(0.35, t + d + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.45);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(t + d); o.stop(t + d + 0.5);
+  });
+  if (navigator.vibrate) try { navigator.vibrate([90, 50, 90]); } catch (_) {}
+}
+
+// ตัวเลขข้อความยังไม่อ่าน: ที่แท็บเบราว์เซอร์ + ไอคอนแอป
+function updateBadge() {
+  const n = S.contacts.reduce((a, c) => a + (c.unread || 0), 0);
+  document.title = n ? `(${n}) TESR Chat` : "TESR Chat";
+  try { if ("setAppBadge" in navigator) n ? navigator.setAppBadge(n) : navigator.clearAppBadge(); } catch (_) {}
+}
+
+const b64ToU8 = (s) => {
+  const p = "=".repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(b, c => c.charCodeAt(0));
+};
+async function pushSub(create) {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  const key = S.settings?.vapid_public_key;
+  if (!sub && create && key) sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:b64ToU8(key) });
+  return sub;
+}
+async function savePushSub() {
+  try {
+    if (!NOTIF.on() || !("Notification" in window) || Notification.permission !== "granted") return;
+    const sub = await pushSub(true); if (!sub) return;
+    const j = sub.toJSON();
+    await sb.from("push_subscriptions").upsert({
+      staff_id:S.me.id, endpoint:j.endpoint, p256dh:j.keys.p256dh, auth:j.keys.auth, user_agent:navigator.userAgent.slice(0, 200),
+    }, { onConflict:"endpoint" });
+  } catch (e) { console.warn("push", e); }
+}
+async function dropPushSub() {
+  try {
+    const sub = await pushSub(false); if (!sub) return;
+    await sb.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+    await sub.unsubscribe();
+  } catch (_) {}
+}
+function renderBell() {
+  const on = NOTIF.on(), perm = "Notification" in window ? Notification.permission : "denied";
+  $("bellBtn").textContent = on ? "🔔" : "🔕";
+  $("bellBtn").title = !on ? "ปิดแจ้งเตือนอยู่ (กดเพื่อเปิด)"
+    : perm === "granted" ? "เปิดแจ้งเตือน + เสียง (กดเพื่อปิด)"
+    : perm === "denied" ? "เบราว์เซอร์บล็อกการแจ้งเตือน มีแค่เสียง (เปิดสิทธิ์ที่ตั้งค่าเว็บไซต์)"
+    : "กดเพื่ออนุญาตการแจ้งเตือน";
+}
+$("bellBtn").onclick = async () => {
+  unlockAudio();
+  const perm = "Notification" in window ? Notification.permission : "denied";
+  if (NOTIF.on() && perm === "default") {
+    const r = await Notification.requestPermission();
+    if (r === "granted") { await savePushSub(); toast("เปิดแจ้งเตือนแล้ว 🔔"); chime(); }
+    else toast("ไม่ได้อนุญาตการแจ้งเตือน (ยังมีเสียงเตือนตอนเปิดหน้าเว็บอยู่)");
+  } else if (NOTIF.on()) {
+    NOTIF.set(false); await dropPushSub(); toast("ปิดการแจ้งเตือนแล้ว 🔕");
+  } else {
+    NOTIF.set(true);
+    if (perm === "default") await Notification.requestPermission();
+    await savePushSub(); toast("เปิดการแจ้งเตือนแล้ว 🔔"); chime();
+  }
+  renderBell();
+};
+renderBell();
+
+// กดแจ้งเตือนแล้วเปิดแชตนั้น
+if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (e) => {
+  if (e.data?.type === "open-chat" && e.data.contactId) openChat(e.data.contactId);
+});
 
 // ===================================================================
 // AUTH
@@ -436,7 +564,7 @@ $("loginForm").onsubmit = async (e) => {
   const { error } = await sb.auth.signInWithPassword({ email:$("email").value, password:$("pass").value });
   if (error) $("loginErr").textContent = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
 };
-$("logout").onclick = () => sb.auth.signOut();
+$("logout").onclick = async () => { await dropPushSub(); sb.auth.signOut(); };
 
 sb.auth.onAuthStateChange((_ev, session) => { session ? boot(session.user) : showLogin(); });
 
@@ -467,6 +595,10 @@ async function boot(user) {
   buildFilters();
   await loadContacts();
   if (!S.live) { S.live = true; subscribe(); setInterval(renderList, 30000); } // อัปเดตตัวนับเวลารอตอบ
+  renderBell(); savePushSub();
+  // เปิดจากการกดแจ้งเตือน: ?c=<contact id>
+  const openId = new URLSearchParams(location.search).get("c");
+  if (openId) { history.replaceState(null, "", location.pathname); openChat(openId); }
 }
 
 async function loadStaff() {
@@ -513,6 +645,7 @@ function filtered() {
 }
 
 function renderList() {
+  updateBadge();
   const list = filtered();
   if (!list.length) { $("list").innerHTML = `<div class="empty" style="padding:30px">ไม่มีแชต</div>`; return; }
   $("list").innerHTML = list.map(c => {
@@ -568,7 +701,7 @@ function renderHead() {
         ${c.business_unit ? " · " + esc(UNITS[c.business_unit]) : ""}
         ${c.assigned_to ? " · ผู้ดูแล: " + esc(S.staff[c.assigned_to]?.display_name || "") : ""}</div>
     </div>
-    <button class="iconbtn" id="infoBtn" title="ข้อมูลลูกค้า / โน้ต">ℹ︎</button>`;
+    <button class="iconbtn" id="infoBtn" title="ข้อมูลลูกค้า / โน้ต">&#x2139;&#xFE0E;</button>`;
   $("backBtn2").onclick = () => { $("inboxView").classList.remove("chatting"); S.current = null; renderList(); };
   $("infoBtn").onclick = () => $("infoCol").classList.toggle("closed");
 }
@@ -578,7 +711,7 @@ function mediaHtml(m) {
   switch (m.msg_type) {
     case "image":   return `<a href="${u}" target="_blank" rel="noopener"><img class="media" src="${u}" alt="รูป" loading="lazy"></a>`;
     case "sticker": return `<img class="sticker" src="${u}" alt="สติกเกอร์" loading="lazy">`;
-    case "video":   return `<video src="${u}" controls preload="metadata"></video>`;
+    case "video":   return `<video src="${u}" controls playsinline preload="metadata"></video>`;
     case "audio":   return `<audio src="${u}" controls preload="none"></audio>`;
     case "location":return `📍 <a href="${u}" target="_blank" rel="noopener">เปิดแผนที่</a>`;
     default:        return `📎 <a href="${u}" target="_blank" rel="noopener" download>${esc(m.file_name || "ดาวน์โหลดไฟล์")}</a>`;
@@ -618,15 +751,206 @@ ta.addEventListener("keydown", (e) => {
   if (!TOUCH && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("composer").requestSubmit(); }
 });
 $("attachBtn").onclick = () => $("file").click();
-$("file").onchange = () => {
-  const f = $("file").files[0]; if (!f) return;
-  if (f.size > 50 * 1024 * 1024) { toast("ไฟล์ใหญ่เกิน 50 MB"); return clearAttach(); }
+$("file").onchange = () => setAttach($("file").files[0]);
+$("camPhoto").onchange = () => setAttach($("camPhoto").files[0]);
+$("camVideo").onchange = () => setAttach($("camVideo").files[0]);
+
+// ย่อรูปจากกล้องมือถือ (หลาย MB) ให้เหลือ JPEG ~1920px — ส่งเร็ว และ LINE แสดงเป็นรูปได้
+async function shrinkImage(f) {
+  if (!f.type.startsWith("image/") || f.type === "image/gif" || f.type === "image/svg+xml") return f;
+  if (f.size < 1.5 * 1024 * 1024 && /jpe?g|png/.test(f.type)) return f;
+  try {
+    const bmp = await createImageBitmap(f);
+    const k = Math.min(1, 1920 / Math.max(bmp.width, bmp.height));
+    const c = Object.assign(document.createElement("canvas"), { width: Math.round(bmp.width * k), height: Math.round(bmp.height * k) });
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+    if (!blob) return f;
+    return new File([blob], (f.name.replace(/\.[^.]+$/, "") || "photo") + ".jpg", { type: "image/jpeg" });
+  } catch (_) { return f; }
+}
+// ภาพหน้าปกวิดีโอ (LINE ต้องใช้ตอนส่งวิดีโอ)
+function videoThumb(f) {
+  return new Promise((res) => {
+    const v = document.createElement("video");
+    const url = URL.createObjectURL(f);
+    let done = false;
+    const finish = (b) => { if (done) return; done = true; URL.revokeObjectURL(url); res(b); };
+    v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url;
+    v.onloadeddata = () => { try { v.currentTime = Math.min(0.5, (v.duration || 1) / 2); } catch (_) { finish(null); } };
+    v.onseeked = () => {
+      try {
+        const k = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight || 1));
+        const c = Object.assign(document.createElement("canvas"), { width: Math.round(v.videoWidth * k) || 320, height: Math.round(v.videoHeight * k) || 240 });
+        c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+        c.toBlob((b) => finish(b), "image/jpeg", 0.8);
+      } catch (_) { finish(null); }
+    };
+    v.onerror = () => finish(null);
+    setTimeout(() => finish(null), 6000);
+  });
+}
+
+async function setAttach(f) {
+  if (!f) return;
+  closePop();
+  f = await shrinkImage(f);
+  if (f.size > 50 * 1024 * 1024) { toast("ไฟล์ใหญ่เกิน 50 MB (วิดีโอควรสั้นไม่เกิน ~1 นาที)"); return clearAttach(); }
   S.pending = f;
-  $("attachBar").innerHTML = `📎 ${esc(f.name)} (${(f.size/1024/1024).toFixed(1)} MB) <button class="btn ghost" style="padding:2px 8px;margin-left:8px" id="rmAttach">ลบ</button>`;
+  S.pendingThumb = f.type.startsWith("video/") ? await videoThumb(f) : null;
+  const prevUrl = f.type.startsWith("image/") ? URL.createObjectURL(f) : S.pendingThumb ? URL.createObjectURL(S.pendingThumb) : "";
+  const icon = f.type.startsWith("video/") ? "🎬" : f.type.startsWith("image/") ? "🖼" : "📎";
+  $("attachBar").innerHTML = `${prevUrl ? `<img class="thumb" src="${prevUrl}" alt="">` : ""}
+    <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${icon} ${esc(f.name)} (${(f.size/1024/1024).toFixed(1)} MB)</span>
+    <button type="button" class="btn ghost" style="padding:2px 10px" id="rmAttach">ลบ</button>`;
   $("attachBar").classList.remove("hidden");
   $("rmAttach").onclick = clearAttach;
+  ta.focus();
+}
+
+// ---------- 📷 กล้อง ----------
+function openPop(html) { $("pop").innerHTML = html; $("pop").classList.remove("hidden"); }
+function closePop() { $("pop").classList.add("hidden"); $("pop").innerHTML = ""; S.popKind = null; }
+document.addEventListener("pointerdown", (e) => {
+  if (!e.target.closest("#pop,#camBtn,#qrBtn,#text")) closePop();
+});
+$("camBtn").onclick = () => {
+  if (S.popKind === "cam") return closePop();
+  S.popKind = "cam";
+  openPop(`<button data-c="photo">📸 ถ่ายรูป</button><button data-c="video">🎥 อัดวิดีโอสั้น</button>
+    <button data-c="pick">🖼 เลือกรูป/วิดีโอในเครื่อง</button>`);
+  $("pop").querySelectorAll("[data-c]").forEach(b => b.onclick = () => {
+    const c = b.dataset.c; closePop();
+    if (c === "pick") { $("file").accept = "image/*,video/*"; $("file").click(); setTimeout(() => $("file").accept = "", 1000); return; }
+    // มือถือ/แท็บเล็ต: เปิดกล้องของเครื่องโดยตรง (คุณภาพดีสุด) · คอม: เปิดกล้องเว็บแคมในหน้าเว็บ
+    if (TOUCH || !navigator.mediaDevices?.getUserMedia) return $(c === "photo" ? "camPhoto" : "camVideo").click();
+    openCamera(c);
+  });
 };
-function clearAttach() { S.pending = null; $("file").value = ""; $("attachBar").classList.add("hidden"); }
+
+const CAM = { stream: null, rec: null, chunks: [], facing: "user", t0: 0, tick: null };
+const MAX_REC = 60; // วินาที
+async function openCamera(mode) {
+  const el = document.createElement("div");
+  el.className = "cam"; el.id = "camView";
+  el.innerHTML = `<video id="camVid" autoplay playsinline muted></video>
+    <div class="timer hidden" id="camTimer">0:00</div>
+    <div class="bar">
+      <button id="camClose">✕ ปิด</button>
+      <button id="camFlip" title="สลับกล้อง">🔄</button>
+      <button id="camShot">📸 ถ่ายรูป</button>
+      <button id="camRec" class="rec">⏺ อัดวิดีโอ</button>
+    </div>`;
+  document.body.appendChild(el);
+  $("camClose").onclick = closeCamera;
+  $("camShot").onclick = snapPhoto;
+  $("camRec").onclick = toggleRec;
+  $("camFlip").onclick = async () => { CAM.facing = CAM.facing === "user" ? "environment" : "user"; await startStream(); };
+  try {
+    await startStream();
+    const cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+    if (cams.length < 2) $("camFlip").classList.add("hidden");
+    if (mode === "video") $("camRec").focus(); else $("camShot").focus();
+  } catch (e) {
+    closeCamera();
+    toast("เปิดกล้องไม่ได้ — กรุณาอนุญาตการใช้กล้องในเบราว์เซอร์");
+  }
+}
+async function startStream() {
+  CAM.stream?.getTracks().forEach(t => t.stop());
+  const video = { facingMode: CAM.facing, width: { ideal: 1280 }, height: { ideal: 720 } };
+  try { CAM.stream = await navigator.mediaDevices.getUserMedia({ video, audio: true }); }
+  catch (_) { CAM.stream = await navigator.mediaDevices.getUserMedia({ video }); } // ไม่มีไมค์ก็ยังถ่ายได้
+  $("camVid").srcObject = CAM.stream;
+}
+function closeCamera() {
+  if (CAM.rec && CAM.rec.state !== "inactive") { CAM.discard = true; CAM.rec.stop(); }
+  clearInterval(CAM.tick);
+  CAM.stream?.getTracks().forEach(t => t.stop()); CAM.stream = null;
+  $("camView")?.remove();
+}
+async function snapPhoto() {
+  const v = $("camVid"); if (!v.videoWidth) return;
+  const c = Object.assign(document.createElement("canvas"), { width: v.videoWidth, height: v.videoHeight });
+  c.getContext("2d").drawImage(v, 0, 0);
+  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.88));
+  closeCamera();
+  setAttach(new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" }));
+}
+function toggleRec() {
+  if (CAM.rec && CAM.rec.state === "recording") return CAM.rec.stop();
+  const mime = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"]
+    .find(t => window.MediaRecorder?.isTypeSupported?.(t));
+  if (!window.MediaRecorder) return toast("เบราว์เซอร์นี้อัดวิดีโอไม่ได้");
+  CAM.chunks = []; CAM.discard = false;
+  CAM.rec = new MediaRecorder(CAM.stream, mime ? { mimeType: mime, videoBitsPerSecond: 1_500_000 } : { videoBitsPerSecond: 1_500_000 });
+  CAM.rec.ondataavailable = (e) => e.data.size && CAM.chunks.push(e.data);
+  CAM.rec.onstop = () => {
+    clearInterval(CAM.tick);
+    if (CAM.discard) return;
+    const type = (CAM.rec.mimeType || mime || "video/webm").split(";")[0];
+    const blob = new Blob(CAM.chunks, { type });
+    closeCamera();
+    setAttach(new File([blob], `video-${Date.now()}.${type.includes("mp4") ? "mp4" : "webm"}`, { type }));
+  };
+  CAM.rec.start(500);
+  CAM.t0 = Date.now();
+  $("camRec").textContent = "⏹ หยุด & ใช้คลิปนี้";
+  $("camShot").classList.add("hidden"); $("camFlip").classList.add("hidden");
+  $("camTimer").classList.remove("hidden");
+  CAM.tick = setInterval(() => {
+    const s = Math.floor((Date.now() - CAM.t0) / 1000);
+    $("camTimer").textContent = `⏺ ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} / 1:00`;
+    if (s >= MAX_REC) CAM.rec.stop();
+  }, 250);
+}
+
+// ---------- ⚡ ข้อความลัด ----------
+const DEFAULT_QR = ["ขอบคุณครับผม", "สวัสดีครับ", "Location: www.tesrshop.com/map_playground", "รับทราบครับ รอสักครู่นะครับ"];
+const quickReplies = () => Array.isArray(S.settings?.quick_replies) ? S.settings.quick_replies : DEFAULT_QR;
+function showQuick(filter = "") {
+  const f = filter.toLowerCase();
+  const items = quickReplies().filter(t => !f || t.toLowerCase().includes(f));
+  S.popKind = "qr"; S.qrItems = items; S.qrSel = 0;
+  openPop(`<div class="ph">ข้อความลัด — กดเพื่อใส่ในช่องพิมพ์${S.me?.role === "admin" ? ` · <a href="#" id="qrManage">จัดการ</a>` : ""}</div>` +
+    (items.length ? items.map((t, i) => `<button data-i="${i}" class="${i === 0 ? "on" : ""}">${esc(t)}</button>`).join("")
+                  : `<div class="ph">ไม่พบข้อความที่ตรงกัน</div>`));
+  $("pop").querySelectorAll("[data-i]").forEach(b => b.onclick = () => pickQuick(items[+b.dataset.i]));
+  const m = $("qrManage");
+  if (m) m.onclick = (e) => { e.preventDefault(); closePop(); goSettingsTab("quick"); };
+}
+function pickQuick(t) {
+  if (t == null) return;
+  const cur = ta.value;
+  ta.value = cur.startsWith("/") || !cur.trim() ? t : cur.replace(/\s*$/, " ") + t;
+  ta.dispatchEvent(new Event("input"));
+  closePop(); ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+$("qrBtn").onclick = () => S.popKind === "qr" ? closePop() : showQuick();
+// พิมพ์ "/" ขึ้นต้น เพื่อค้นหาข้อความลัด เช่น "/ขอบ"
+ta.addEventListener("input", () => {
+  if (ta.value.startsWith("/") && !ta.value.includes("\n")) showQuick(ta.value.slice(1));
+  else if (S.popKind === "qr") closePop();
+});
+ta.addEventListener("keydown", (e) => {
+  if (S.popKind !== "qr" || !S.qrItems?.length) return;
+  const btns = [...$("pop").querySelectorAll("[data-i]")];
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    S.qrSel = (S.qrSel + (e.key === "ArrowDown" ? 1 : -1) + btns.length) % btns.length;
+    btns.forEach((b, i) => b.classList.toggle("on", i === S.qrSel));
+    btns[S.qrSel].scrollIntoView({ block: "nearest" });
+  } else if ((e.key === "Enter" || e.key === "Tab") && ta.value.startsWith("/")) {
+    e.preventDefault(); e.stopImmediatePropagation(); pickQuick(S.qrItems[S.qrSel]);
+  } else if (e.key === "Escape") closePop();
+}, true);
+
+function clearAttach() {
+  S.pending = null; S.pendingThumb = null;
+  ["file", "camPhoto", "camVideo"].forEach(id => $(id).value = "");
+  $("attachBar").classList.add("hidden");
+}
 
 $("composer").onsubmit = async (e) => {
   e.preventDefault();
@@ -639,12 +963,18 @@ $("composer").onsubmit = async (e) => {
     if (file) {
       const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
       const path = `out/${new Date().toISOString().slice(0,7)}/${crypto.randomUUID()}.${ext}`;
+      $("sendBtn").textContent = "กำลังอัปโหลด…";
       const { error } = await sb.storage.from("media").upload(path, file, { contentType:file.type || undefined });
       if (error) throw new Error("อัปโหลดไม่สำเร็จ: " + error.message);
       payload.media_url = sb.storage.from("media").getPublicUrl(path).data.publicUrl;
       payload.file_name = file.name;
       payload.media_kind = file.type.startsWith("image/") ? "image"
         : file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : "file";
+      if (payload.media_kind === "video" && S.pendingThumb) { // หน้าปกวิดีโอ (LINE ใช้)
+        const tp = path.replace(/\.[a-z0-9]+$/, "") + "-preview.jpg";
+        const up = await sb.storage.from("media").upload(tp, S.pendingThumb, { contentType: "image/jpeg" });
+        if (!up.error) payload.preview_url = sb.storage.from("media").getPublicUrl(tp).data.publicUrl;
+      }
     }
     const { data, error } = await sb.functions.invoke("send-message", { body:payload });
     if (error) {
@@ -657,7 +987,7 @@ $("composer").onsubmit = async (e) => {
   } catch (err) {
     toast(err.message);
   } finally {
-    $("sendBtn").disabled = false; ta.focus();
+    $("sendBtn").disabled = false; $("sendBtn").textContent = "ส่ง"; ta.focus();
   }
 };
 
@@ -728,12 +1058,12 @@ function subscribe() {
       renderList();
     })
     .on("postgres_changes", { event:"INSERT", schema:"public", table:"messages" }, ({ new:m }) => {
+      const viewing = S.current?.id === m.contact_id && S.msgs && !document.hidden;
       if (S.current?.id === m.contact_id && S.msgs) {
         S.msgs.push(m); renderMsgs();
-        if (m.direction === "in") sb.from("contacts").update({ unread:0 }).eq("id", m.contact_id);
-      } else if (m.direction === "in") {
-        notify(m);
+        if (m.direction === "in" && !document.hidden) sb.from("contacts").update({ unread:0 }).eq("id", m.contact_id);
       }
+      if (m.direction === "in") notify(m, viewing);
     })
     .on("postgres_changes", { event:"INSERT", schema:"public", table:"notes" }, ({ new:n }) => {
       if (S.current?.id === n.contact_id && n.author !== S.me.id) renderInfo();
@@ -741,17 +1071,24 @@ function subscribe() {
     .subscribe();
 }
 
-function notify(m) {
+// มีข้อความเข้า: เล่นเสียงทุกครั้ง (ยกเว้นกำลังเปิดแชตนั้นอยู่จะเบาลงเป็นแค่ตัวเลข) +
+// ถ้าหน้าเว็บถูกย่อ/อยู่แท็บอื่น แสดงแจ้งเตือนเด้ง (ใช้ tag เดียวกับ Web Push จึงไม่เด้งซ้ำ)
+async function notify(m, viewing) {
+  if (!NOTIF.on()) return;
+  chime();
+  if (viewing || !document.hidden) { if (!viewing) toast(`💬 ${S.contacts.find(x => x.id === m.contact_id)?.display_name || "ลูกค้า"}: ${m.text || "ส่งไฟล์/รูป"}`); return; }
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
   const c = S.contacts.find(x => x.id === m.contact_id);
-  document.title = "🔴 ข้อความใหม่ — TESR Chat";
-  if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
-    new Notification(`${CH[m.channel]?.name}: ${c?.display_name || "ลูกค้า"}`, { body:m.text || "[ไฟล์/รูป]" });
-  }
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    const opts = { body:m.text || "ส่งไฟล์/รูป", tag:`tesr-${m.contact_id}`, icon:"icon.svg", badge:"icon.svg", data:{ contactId:m.contact_id } };
+    const title = `${CH[m.channel]?.name || ""} · ${c?.display_name || "ลูกค้า"}`;
+    reg ? reg.showNotification(title, opts) : new Notification(title, opts);
+  } catch (_) {}
 }
-document.addEventListener("visibilitychange", () => { if (!document.hidden) document.title = "TESR Chat"; });
-document.addEventListener("click", () => {
-  if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
-}, { once:true });
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && S.current?.unread) sb.from("contacts").update({ unread:0 }).eq("id", S.current.id);
+});
 
 // ===================================================================
 // VIEW SWITCH + DASHBOARD
@@ -987,7 +1324,7 @@ async function adminApi(body) {
 
 function loadSettings() {
   if (S.me?.role !== "admin") return;
-  ({ channels:renderChannels, staff:renderStaffAdmin, general:renderGeneral })[SET_TAB]();
+  ({ channels:renderChannels, staff:renderStaffAdmin, quick:renderQuickAdmin, general:renderGeneral })[SET_TAB]();
 }
 
 async function renderChannels() {
@@ -1079,11 +1416,13 @@ async function renderChannels() {
 
 async function renderStaffAdmin() {
   $("setBody").innerHTML = `<div class="empty" style="padding:20px">กำลังโหลด…</div>`;
-  const [{ data: staff }, users] = await Promise.all([
+  const [{ data: staff }, users, { data: pws }] = await Promise.all([
     sb.from("staff").select("*").order("created_at"),
     adminApi({ action:"list_users" }),
+    sb.rpc("admin_get_initial_passwords"),
   ]);
   const emails = Object.fromEntries((users?.data || []).map(u => [u.id, u]));
+  const initPw = Object.fromEntries((pws || []).map(r => [r.staff_id, r.password]));
   $("setBody").innerHTML = `
     <div class="card" style="display:grid;gap:10px">
       <div style="font-weight:600">เพิ่มพนักงาน</div>
@@ -1096,15 +1435,20 @@ async function renderStaffAdmin() {
         <div class="field"><label>สิทธิ์</label><select id="nuRole" class="inp"><option value="agent">พนักงาน</option><option value="admin">แอดมิน</option></select></div>
       </div>
       <div><button class="btn" id="nuAdd">+ เพิ่มพนักงาน</button></div>
-      <div class="hint">ส่งอีเมลและรหัสผ่านให้พนักงานเอง ระบบไม่ส่งอีเมลให้</div>
+      <div class="hint">ส่งอีเมลและรหัสผ่านให้พนักงานเอง ระบบไม่ส่งอีเมลให้ · ช่อง "รหัสเริ่มต้น" แอดมินดูได้จนกว่าพนักงานจะกด 🔑 เปลี่ยนรหัสเอง (จากนั้นจะหายไปเพื่อความปลอดภัย)</div>
     </div>
     <div style="overflow-x:auto;margin-top:14px"><table>
-      <tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>เบอร์โทร</th><th>อีเมล</th><th>สิทธิ์</th><th>ใช้งาน</th><th>เข้าใช้ล่าสุด</th><th></th></tr>
+      <tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>เบอร์โทร</th><th>อีเมล</th><th>รหัสเริ่มต้น</th><th>สิทธิ์</th><th>ใช้งาน</th><th>เข้าใช้ล่าสุด</th><th></th></tr>
       ${(staff || []).map(s => `<tr data-id="${s.id}">
         <td><input class="inp" data-f="display_name" value="${esc(s.display_name)}" style="padding:5px 8px;min-width:140px"></td>
         <td><input class="inp" data-f="position" value="${esc(s.position || "")}" style="padding:5px 8px;min-width:100px"></td>
         <td><input class="inp" data-f="phone" type="tel" value="${esc(s.phone || "")}" style="padding:5px 8px;min-width:110px"></td>
         <td style="font-size:13px">${esc(emails[s.id]?.email || "")}</td>
+        <td style="white-space:nowrap;font-size:13px">${initPw[s.id]
+          ? `<code data-pwv="${esc(initPw[s.id])}" style="font-family:ui-monospace,monospace">••••••••</code>
+             <button class="btn ghost" data-pwshow title="แสดง/ซ่อน" style="padding:2px 6px;font-size:13px">👁</button>
+             <button class="btn ghost" data-pwcopy title="คัดลอก" style="padding:2px 6px;font-size:13px">📋</button>`
+          : `<span style="color:var(--muted)">เปลี่ยนเองแล้ว</span>`}</td>
         <td><select class="inp" data-f="role" style="padding:5px 8px"><option value="agent"${s.role === "agent" ? " selected" : ""}>พนักงาน</option><option value="admin"${s.role === "admin" ? " selected" : ""}>แอดมิน</option></select></td>
         <td><input type="checkbox" data-f="active"${s.active ? " checked" : ""} style="width:18px;height:18px;accent-color:var(--brand)"></td>
         <td style="font-size:13px;color:var(--muted)">${emails[s.id]?.last_sign_in_at ? dayLabel(emails[s.id].last_sign_in_at) : "–"}</td>
@@ -1130,8 +1474,63 @@ async function renderStaffAdmin() {
       const pw = prompt("รหัสผ่านใหม่ (อย่างน้อย 8 ตัว)", rnd(5)); if (!pw) return;
       const r = await adminApi({ action:"reset_password", user_id:id, password:pw });
       toast(r?.ok ? `เปลี่ยนแล้ว: ${pw}` : (r?.msg || "ไม่สำเร็จ"));
+      if (r?.ok) renderStaffAdmin();
     };
+    const code = tr.querySelector("[data-pwv]");
+    if (code) {
+      tr.querySelector("[data-pwshow]").onclick = () => {
+        code.textContent = code.textContent.startsWith("•") ? code.dataset.pwv : "••••••••";
+      };
+      tr.querySelector("[data-pwcopy]").onclick = async () => {
+        try { await navigator.clipboard.writeText(code.dataset.pwv); toast("คัดลอกรหัสแล้ว"); }
+        catch { prompt("คัดลอกรหัสนี้", code.dataset.pwv); }
+      };
+    }
   });
+}
+
+function goSettingsTab(t) {
+  SET_TAB = t;
+  $("setTabs").querySelectorAll(".chip").forEach(x => x.classList.toggle("on", x.dataset.t === t));
+  document.querySelector('header nav button[data-view="settings"]')?.click();
+}
+
+// ---------- ตั้งค่า > ข้อความลัด ----------
+function renderQuickAdmin() {
+  let list = [...quickReplies()];
+  const draw = () => {
+    $("setBody").innerHTML = `
+      <div class="card" style="display:grid;gap:10px;max-width:640px">
+        <div style="font-weight:600">ข้อความลัด (ตอบเร็ว)</div>
+        <div class="hint">พนักงานกดปุ่ม ⚡ ข้างช่องพิมพ์ หรือพิมพ์ <b>/</b> ตามด้วยคำค้น (เช่น <code>/ขอบ</code>) แล้วกด Enter เพื่อใส่ข้อความ · เรียงลำดับด้วยปุ่ม ↑ ↓</div>
+        <div id="qrList" style="display:grid;gap:8px">
+          ${list.map((t, i) => `<div class="qr-row" data-i="${i}">
+            <textarea rows="1">${esc(t)}</textarea>
+            <button class="btn ghost" data-up title="เลื่อนขึ้น" style="padding:6px 10px"${i === 0 ? " disabled" : ""}>↑</button>
+            <button class="btn ghost" data-down title="เลื่อนลง" style="padding:6px 10px"${i === list.length - 1 ? " disabled" : ""}>↓</button>
+            <button class="btn ghost" data-del title="ลบ" style="padding:6px 10px">🗑</button>
+          </div>`).join("") || `<div class="hint">ยังไม่มีข้อความลัด</div>`}
+        </div>
+        <div class="btnrow"><button class="btn ghost" id="qrAdd">+ เพิ่มข้อความ</button><button class="btn" id="qrSave">💾 บันทึก</button></div>
+      </div>`;
+    const sync = () => { list = [...$("qrList").querySelectorAll("textarea")].map(x => x.value); };
+    $("qrList").querySelectorAll(".qr-row").forEach(row => {
+      const i = +row.dataset.i;
+      row.querySelector("[data-up]").onclick = () => { sync(); [list[i - 1], list[i]] = [list[i], list[i - 1]]; draw(); };
+      row.querySelector("[data-down]").onclick = () => { sync(); [list[i + 1], list[i]] = [list[i], list[i + 1]]; draw(); };
+      row.querySelector("[data-del]").onclick = () => { sync(); list.splice(i, 1); draw(); };
+    });
+    $("qrAdd").onclick = () => { sync(); list.push(""); draw(); $("qrList").querySelector(".qr-row:last-child textarea")?.focus(); };
+    $("qrSave").onclick = async () => {
+      sync();
+      const clean = list.map(t => t.trim()).filter(Boolean);
+      const { error } = await sb.from("app_settings").upsert({ key:"quick_replies", value:clean, updated_at:new Date().toISOString() });
+      if (error) return toast(error.message);
+      S.settings.quick_replies = clean; list = [...clean]; draw();
+      toast("บันทึกข้อความลัดแล้ว");
+    };
+  };
+  draw();
 }
 
 function renderGeneral() {
