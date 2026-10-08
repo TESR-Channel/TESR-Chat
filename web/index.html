@@ -132,6 +132,17 @@ header .me{margin-left:auto;display:flex;gap:10px;align-items:center;color:var(-
 @media (max-width:420px){header nav button{padding:6px 6px!important;font-size:16px!important} header .me{gap:4px!important} header .me .themebtn{width:30px!important;height:30px!important;font-size:14px!important}
 .composer{gap:6px;padding:8px}.composer .iconbtn{width:36px;height:36px;font-size:16px}}
 .attach .thumb{width:54px;height:54px;border-radius:8px;object-fit:cover;background:#000}
+.attach{flex-direction:column;align-items:stretch;gap:6px}
+.att-head{display:flex;align-items:center;gap:8px}
+.att-list{display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:thin}
+.att-item{position:relative;flex:none;width:64px}
+.att-item .thumb,.att-item .fileph{width:64px;height:64px;border-radius:10px;object-fit:cover;background:var(--bg);border:1px solid var(--line)}
+.att-item .fileph{display:grid;place-items:center;font-size:24px}
+.att-item .nm{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;margin-top:2px}
+.att-item .vid{position:absolute;left:4px;top:44px;font-size:11px;color:#fff;text-shadow:0 1px 2px #000}
+.att-item .x{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:2px solid var(--panel);background:var(--ink);color:var(--panel);font-size:11px;display:grid;place-items:center;padding:0;cursor:pointer}
+.att-add{flex:none;width:64px;height:64px;border-radius:10px;border:2px dashed var(--line);background:none;color:var(--muted);font-size:22px}
+#composer.drop{outline:2px dashed var(--brand);outline-offset:-4px}
 .composer{position:relative;min-width:0}
 #chatCol{min-width:0}
 .pop{position:absolute;bottom:calc(100% + 6px);left:10px;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:12px;
@@ -303,10 +314,10 @@ header nav button .ico{margin-right:4px}
       <div id="msgs"><div class="empty">ยังไม่ได้เลือกลูกค้า</div></div>
       <div class="attach hidden" id="attachBar"></div>
       <form class="composer" id="composer">
-        <input type="file" id="file" hidden>
+        <input type="file" id="file" multiple hidden>
         <input type="file" id="camPhoto" accept="image/*" capture="environment" hidden>
         <input type="file" id="camVideo" accept="video/*" capture="environment" hidden>
-        <button type="button" class="iconbtn" id="attachBtn" title="แนบรูป/ไฟล์">📎</button>
+        <button type="button" class="iconbtn" id="attachBtn" title="แนบรูป/ไฟล์ (เลือกได้หลายไฟล์)">📎</button>
         <button type="button" class="iconbtn" id="camBtn" title="ถ่ายรูป / อัดวิดีโอสั้น">📷</button>
         <button type="button" class="iconbtn" id="qrBtn" title="ข้อความลัด (หรือพิมพ์ / )">⚡</button>
         <div class="pop hidden" id="pop"></div>
@@ -773,9 +784,22 @@ ta.addEventListener("keydown", (e) => {
   if (!TOUCH && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("composer").requestSubmit(); }
 });
 $("attachBtn").onclick = () => $("file").click();
-$("file").onchange = () => setAttach($("file").files[0]);
-$("camPhoto").onchange = () => setAttach($("camPhoto").files[0]);
-$("camVideo").onchange = () => setAttach($("camVideo").files[0]);
+$("file").onchange = () => { addAttach([...$("file").files]); $("file").value = ""; };
+$("camPhoto").onchange = () => { addAttach([...$("camPhoto").files]); $("camPhoto").value = ""; };
+$("camVideo").onchange = () => { addAttach([...$("camVideo").files]); $("camVideo").value = ""; };
+// วางรูปจากคลิปบอร์ด (Ctrl+V) / ลากไฟล์มาวางที่ช่องพิมพ์ ได้หลายไฟล์
+ta.addEventListener("paste", (e) => {
+  const fs = [...(e.clipboardData?.files || [])];
+  if (fs.length) { e.preventDefault(); addAttach(fs); }
+});
+["dragenter", "dragover"].forEach(ev => $("composer").addEventListener(ev, (e) => {
+  if (e.dataTransfer?.types?.includes("Files")) { e.preventDefault(); $("composer").classList.add("drop"); }
+}));
+["dragleave", "drop"].forEach(ev => $("composer").addEventListener(ev, () => $("composer").classList.remove("drop")));
+$("composer").addEventListener("drop", (e) => {
+  const fs = [...(e.dataTransfer?.files || [])];
+  if (fs.length) { e.preventDefault(); addAttach(fs); }
+});
 
 // ย่อรูปจากกล้องมือถือ (หลาย MB) ให้เหลือ JPEG ~1920px — ส่งเร็ว และ LINE แสดงเป็นรูปได้
 async function shrinkImage(f) {
@@ -813,21 +837,48 @@ function videoThumb(f) {
   });
 }
 
-async function setAttach(f) {
-  if (!f) return;
+// ไฟล์แนบ: เลือกได้หลายไฟล์พร้อมกัน (เพิ่มทีละชุดได้) แล้วกดส่งทีเดียว ระบบทยอยส่งให้ทีละไฟล์ตามลำดับ
+const MAX_ATTACH = 20;
+S.pending = [];
+async function addAttach(files) {
+  files = (files || []).filter(Boolean);
+  if (!files.length) return;
   closePop();
-  f = await shrinkImage(f);
-  if (f.size > 50 * 1024 * 1024) { toast("ไฟล์ใหญ่เกิน 50 MB (วิดีโอควรสั้นไม่เกิน ~1 นาที)"); return clearAttach(); }
-  S.pending = f;
-  S.pendingThumb = f.type.startsWith("video/") ? await videoThumb(f) : null;
-  const prevUrl = f.type.startsWith("image/") ? URL.createObjectURL(f) : S.pendingThumb ? URL.createObjectURL(S.pendingThumb) : "";
-  const icon = f.type.startsWith("video/") ? "🎬" : f.type.startsWith("image/") ? "🖼" : "📎";
-  $("attachBar").innerHTML = `${prevUrl ? `<img class="thumb" src="${prevUrl}" alt="">` : ""}
-    <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${icon} ${esc(f.name)} (${(f.size/1024/1024).toFixed(1)} MB)</span>
-    <button type="button" class="btn ghost" style="padding:2px 10px" id="rmAttach">ลบ</button>`;
+  let skipped = 0;
+  for (let f of files) {
+    if (S.pending.length >= MAX_ATTACH) { toast(`แนบได้สูงสุดครั้งละ ${MAX_ATTACH} ไฟล์`); break; }
+    f = await shrinkImage(f);
+    if (f.size > 50 * 1024 * 1024) { skipped++; continue; }
+    const thumb = f.type.startsWith("video/") ? await videoThumb(f) : null;
+    const prev = f.type.startsWith("image/") ? URL.createObjectURL(f) : thumb ? URL.createObjectURL(thumb) : "";
+    S.pending.push({ file: f, thumb, prev });
+    renderAttach();
+  }
+  if (skipped) toast(`ข้าม ${skipped} ไฟล์ที่ใหญ่เกิน 50 MB (วิดีโอควรสั้นไม่เกิน ~1 นาที)`);
+  ta.focus();
+}
+function renderAttach() {
+  const list = S.pending;
+  if (!list.length) { $("attachBar").classList.add("hidden"); $("attachBar").innerHTML = ""; return; }
+  const total = list.reduce((a, x) => a + x.file.size, 0);
+  $("attachBar").innerHTML = `<div class="att-head"><span style="flex:1">📎 แนบ ${list.length} ไฟล์ · ${(total/1024/1024).toFixed(1)} MB${list.length > 1 ? " · ระบบจะทยอยส่งทีละไฟล์" : ""}</span>
+      <button type="button" class="btn ghost" style="padding:2px 10px" id="rmAttach">ลบทั้งหมด</button></div>
+    <div class="att-list">${list.map((x, i) => {
+      const f = x.file, icon = f.type.startsWith("video/") ? "🎬" : f.type.startsWith("audio/") ? "🎤" : "📎";
+      return `<div class="att-item" title="${esc(f.name)}">
+        ${x.prev ? `<img class="thumb" src="${x.prev}" alt="">` : `<div class="fileph">${icon}</div>`}
+        ${f.type.startsWith("video/") && x.prev ? `<span class="vid">▶</span>` : ""}
+        <div class="nm">${esc(f.name)}</div>
+        <button type="button" class="x" data-rm="${i}" aria-label="เอาออก">✕</button></div>`;
+    }).join("")}${list.length < MAX_ATTACH ? `<button type="button" class="att-add" id="attMore" title="เพิ่มไฟล์">＋</button>` : ""}</div>`;
   $("attachBar").classList.remove("hidden");
   $("rmAttach").onclick = clearAttach;
-  ta.focus();
+  $("attachBar").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => {
+    const [x] = S.pending.splice(+b.dataset.rm, 1);
+    if (x?.prev) URL.revokeObjectURL(x.prev);
+    renderAttach();
+  });
+  if ($("attMore")) $("attMore").onclick = () => $("file").click();
 }
 
 // ---------- 📷 กล้อง ----------
@@ -897,7 +948,7 @@ async function snapPhoto() {
   c.getContext("2d").drawImage(v, 0, 0);
   const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.88));
   closeCamera();
-  setAttach(new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" }));
+  addAttach([new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" })]);
 }
 function toggleRec() {
   if (CAM.rec && CAM.rec.state === "recording") return CAM.rec.stop();
@@ -913,7 +964,7 @@ function toggleRec() {
     const type = (CAM.rec.mimeType || mime || "video/webm").split(";")[0];
     const blob = new Blob(CAM.chunks, { type });
     closeCamera();
-    setAttach(new File([blob], `video-${Date.now()}.${type.includes("mp4") ? "mp4" : "webm"}`, { type }));
+    addAttach([new File([blob], `video-${Date.now()}.${type.includes("mp4") ? "mp4" : "webm"}`, { type })]);
   };
   CAM.rec.start(500);
   CAM.t0 = Date.now();
@@ -968,10 +1019,11 @@ ta.addEventListener("keydown", (e) => {
   } else if (e.key === "Escape") closePop();
 }, true);
 
-function clearAttach() {
-  S.pending = null; S.pendingThumb = null;
+function clearAttach(keepPreviews) {
+  if (!keepPreviews) (S.pending || []).forEach(x => x.prev && URL.revokeObjectURL(x.prev));
+  S.pending = [];
   ["file", "camPhoto", "camVideo"].forEach(id => $(id).value = "");
-  $("attachBar").classList.add("hidden");
+  $("attachBar").classList.add("hidden"); $("attachBar").innerHTML = "";
 }
 
 // ส่งข้อความ: แสดงในแชตทันที (สถานะ "กำลังส่ง…") แล้วค่อยส่งเบื้องหลัง ไม่ต้องรอ
@@ -980,20 +1032,25 @@ let sendQueue = Promise.resolve();
 $("composer").onsubmit = (e) => {
   e.preventDefault();
   if (!S.current) return toast("เลือกลูกค้าก่อน");
-  const text = ta.value.trim(), file = S.pending, thumb = S.pendingThumb;
-  if (!text && !file) return;
+  const text = ta.value.trim(), items = [...S.pending];
+  if (!text && !items.length) return;
   const contact = S.current;
-  const kind = !file ? "text" : file.type.startsWith("image/") ? "image"
-    : file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : "file";
-  const tmp = {
-    id:`tmp-${Date.now()}-${Math.random()}`, contact_id:contact.id, direction:"out", msg_type:kind,
-    text:text || null, media_url:file ? URL.createObjectURL(file) : null, file_name:file?.name,
-    sent_by:S.me.id, send_status:"sending", created_at:new Date().toISOString(),
-  };
-  if (S.msgs && S.current?.id === contact.id) { S.msgs.push(tmp); renderMsgs(); }
-  ta.value = ""; ta.style.height = "auto"; clearAttach(); ta.focus();
-
-  sendQueue = sendQueue.then(() => sendNow(contact, text, file, thumb, kind, tmp)).catch(() => {});
+  // หลายไฟล์ = หลายข้อความ ส่งตามลำดับ (ข้อความที่พิมพ์ไปกับไฟล์แรก)
+  const jobs = items.length ? items.map((x, i) => ({ text: i === 0 ? text : "", ...x })) : [{ text, file: null, thumb: null }];
+  for (const j of jobs) {
+    const f = j.file;
+    const kind = !f ? "text" : f.type.startsWith("image/") ? "image"
+      : f.type.startsWith("video/") ? "video" : f.type.startsWith("audio/") ? "audio" : "file";
+    const tmp = {
+      id:`tmp-${Date.now()}-${Math.random()}`, contact_id:contact.id, direction:"out", msg_type:kind,
+      text:j.text || null, media_url:f ? (f.type.startsWith("image/") && j.prev ? j.prev : URL.createObjectURL(f)) : null, file_name:f?.name,
+      sent_by:S.me.id, send_status:"sending", created_at:new Date().toISOString(),
+    };
+    if (S.msgs && S.current?.id === contact.id) S.msgs.push(tmp);
+    sendQueue = sendQueue.then(() => sendNow(contact, j.text, f, j.thumb, kind, tmp)).catch(() => {});
+  }
+  if (S.msgs && S.current?.id === contact.id) renderMsgs();
+  ta.value = ""; ta.style.height = "auto"; clearAttach(true); ta.focus();
 };
 
 async function sendNow(contact, text, file, thumb, kind, tmp) {
