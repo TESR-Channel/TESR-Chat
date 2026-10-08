@@ -1,6 +1,6 @@
 // TESR Chat — Service Worker
 // ทำให้ติดตั้งเป็นแอปได้ เปิดเร็วขึ้น และรับแจ้งเตือนข้อความใหม่ (Web Push) แม้ปิดแอปอยู่
-const CACHE = "tesr-chat-v3";
+const CACHE = "tesr-chat-v4";
 const SHELL = ["./", "./index.html", "./config.js", "./icon.svg", "./manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
@@ -40,7 +40,7 @@ self.addEventListener("push", (e) => {
       body: d.body || "มีข้อความใหม่",
       tag: d.tag || "tesr-chat",
       renotify: true,
-      icon: "icon.svg",
+      icon: "https://cfhpkmzevxyyxckwvrpk.supabase.co/storage/v1/object/public/media/app-icons/icon-192.png",
       badge: "icon.svg",
       vibrate: [120, 60, 120],
       data: { contactId: d.contactId },
