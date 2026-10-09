@@ -77,6 +77,8 @@ header nav{display:flex;gap:4px;margin-left:12px}
 header nav button{background:none;border:0;padding:6px 12px;border-radius:8px;color:var(--muted);font-weight:500}
 header nav button.on{background:var(--bg);color:var(--ink)}
 header .me{margin-left:auto;display:flex;gap:10px;align-items:center;color:var(--muted);font-size:13px}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--warn);flex:none;transition:background .3s}
+.live-dot.on{background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent)}
 
 .inbox{display:grid;grid-template-columns:320px 1fr 300px;min-height:0}
 .col{min-height:0;display:flex;flex-direction:column;background:var(--panel)}
@@ -276,7 +278,7 @@ header nav button .ico{margin-right:4px}
       <button data-view="dash" title="สถิติทีม"><span class="ico">📊</span><span class="txt">สถิติทีม</span></button>
       <button data-view="settings" id="navSettings" class="hidden" title="ตั้งค่า"><span class="ico">⚙</span><span class="txt">ตั้งค่า</span></button>
     </nav>
-    <div class="me"><span id="meName"></span>
+    <div class="me"><i id="liveDot" class="live-dot" title="กำลังเชื่อมต่อ…"></i><span id="meName"></span>
       <button class="themebtn installbtn" id="installBtn" type="button" title="ติดตั้งเป็นแอป">📲</button>
       <button class="themebtn" id="bellBtn" type="button" title="การแจ้งเตือน">🔔</button>
       <button class="themebtn" id="pwBtn" type="button" title="เปลี่ยนรหัสผ่านของฉัน">🔑</button>
@@ -624,7 +626,11 @@ async function boot(user) {
   await loadStaff();
   buildFilters();
   await loadContacts();
-  if (!S.live) { S.live = true; subscribe(); setInterval(renderList, 30000); } // อัปเดตตัวนับเวลารอตอบ
+  if (!S.live) {
+    S.live = true; subscribe();
+    setInterval(renderList, 30000); // อัปเดตตัวนับเวลารอตอบ
+    setInterval(() => { if (!document.hidden) catchUp(); }, 45000); // กันพลาด: ดึงข้อมูลล่าสุดซ้ำเป็นระยะ
+  }
   renderBell(); savePushSub();
   // เปิดจากการกดแจ้งเตือน: ?c=<contact id>
   const openId = new URLSearchParams(location.search).get("c");
@@ -1165,8 +1171,52 @@ async function renderInfo() {
 // ===================================================================
 // REALTIME
 // ===================================================================
+// การเชื่อมต่อสดหลุดได้ (มือถือล็อกจอ/สลับแอป/เน็ตสะดุด) → ต่อใหม่อัตโนมัติ แล้วดึงข้อความที่พลาดไประหว่างนั้น
+const RT = { ch:null, ok:false, down:false, retry:0, t:0, busy:false, last:Date.now() };
+function setLive(on) {
+  const d = $("liveDot"); if (!d) return;
+  d.classList.toggle("on", on);
+  d.title = on ? "ข้อความเข้าแบบสด" : "กำลังเชื่อมต่อใหม่…";
+}
+function resubscribe(delay = 0) {
+  clearTimeout(RT.t);
+  RT.t = setTimeout(subscribe, delay);
+}
+// ดึงรายชื่อแชต + ข้อความของแชตที่เปิดอยู่ใหม่ (เก็บข้อความที่กำลังส่ง/ส่งไม่สำเร็จไว้)
+async function catchUp() {
+  if (RT.busy || !S.me) return;
+  RT.busy = true; RT.last = Date.now();
+  try {
+    await loadContacts();
+    const id = S.current?.id;
+    if (!id) return;
+    const c = S.contacts.find(x => x.id === id);
+    if (c) { S.current = c; renderHead(); }
+    if (!S.msgs) return;
+    const { data, error } = await sb.from("messages").select("*").eq("contact_id", id)
+      .order("created_at", { ascending:true }).limit(1000);
+    if (error || !data || S.current?.id !== id || !S.msgs) return;
+    const local = S.msgs.filter(x => String(x.id).startsWith("tmp-"));
+    const before = S.msgs.length - local.length;
+    S.msgs = data.concat(local);
+    if (data.length !== before) renderMsgs();
+    if (c?.unread && !document.hidden) sb.from("contacts").update({ unread:0 }).eq("id", id);
+  } catch (_) {
+  } finally { RT.busy = false; }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden || !S.me) return;
+  if (!RT.ok) resubscribe(0);
+  if (Date.now() - RT.last > 5000) catchUp();
+});
+window.addEventListener("online", () => { if (S.me) { resubscribe(0); catchUp(); } });
+window.addEventListener("focus", () => { if (S.me && Date.now() - RT.last > 15000) catchUp(); });
+
 function subscribe() {
-  sb.channel("tesr-chat")
+  if (RT.ch) { const old = RT.ch; RT.ch = null; try { sb.removeChannel(old); } catch (_) {} }
+  const ch = sb.channel("tesr-chat-" + Date.now());
+  RT.ch = ch;
+  ch
     .on("postgres_changes", { event:"*", schema:"public", table:"contacts" }, ({ eventType, new:row }) => {
       const i = S.contacts.findIndex(c => c.id === row.id);
       if (eventType === "INSERT" || i < 0) S.contacts.unshift(row); else S.contacts[i] = row;
@@ -1191,7 +1241,17 @@ function subscribe() {
     .on("postgres_changes", { event:"INSERT", schema:"public", table:"notes" }, ({ new:n }) => {
       if (S.current?.id === n.contact_id && n.author !== S.me.id) renderInfo();
     })
-    .subscribe();
+    .subscribe((status) => {
+      if (ch !== RT.ch) return; // ช่องเก่าที่ถูกปิดไปแล้ว
+      if (status === "SUBSCRIBED") {
+        const wasDown = RT.down;
+        RT.ok = true; RT.down = false; RT.retry = 0; setLive(true);
+        if (wasDown) catchUp();
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        RT.ok = false; RT.down = true; setLive(false);
+        resubscribe(Math.min(30000, 2000 * 2 ** RT.retry++));
+      }
+    });
 }
 
 // มีข้อความเข้า: เล่นเสียงทุกครั้ง (ยกเว้นกำลังเปิดแชตนั้นอยู่จะเบาลงเป็นแค่ตัวเลข) +

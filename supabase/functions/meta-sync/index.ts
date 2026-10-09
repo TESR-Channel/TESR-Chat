@@ -1,4 +1,4 @@
-// TESR Chat — ดึงข้อความ Facebook / Instagram จากกล่องข้อความของเพจทุก 1 นาที (pg_cron เรียก)
+// TESR Chat — ดึงข้อความ Facebook / Instagram จากกล่องข้อความของเพจทุก 20 วินาที (pg_cron เรียก)
 // ใช้คู่กับ webhook: ช่วงที่แอป Meta ยังไม่ Publish ระบบจะไม่ส่ง webhook ของลูกค้าทั่วไปมาให้
 // ฟังก์ชันนี้จึงอ่านบทสนทนาของเพจโดยตรงแทน (ข้อความซ้ำจะถูกกรองด้วย message id)
 import { db, getChannel, storeFromUrl, GRAPH, ChannelConfig, json } from "../_shared/config.ts";
@@ -102,9 +102,18 @@ async function syncChannel(kind: "facebook" | "instagram") {
 Deno.serve(async (req) => {
   const k = req.headers.get("x-sync-key") ?? new URL(req.url).searchParams.get("k");
   if (!k || k !== (await secret("sync_key"))) return new Response("forbidden", { status: 403 });
+  // กันรันซ้อน (cron เรียกทุก 20 วินาที ถ้ารอบก่อนยังไม่จบให้ข้ามรอบนี้) — ล็อกหมดอายุเองใน 50 วินาที
+  const now = Date.now();
+  const { data: got } = await db.from("app_secrets").update({ value: new Date(now).toISOString() })
+    .eq("key", "meta_sync_lock").lt("value", new Date(now - 50_000).toISOString()).select("key");
+  if (!got?.length) return json({ ok: true, skipped: "รอบก่อนยังทำงานอยู่" });
   const out = [];
-  for (const kind of ["facebook", "instagram"] as const) {
-    try { out.push(await syncChannel(kind)); } catch (e) { out.push({ kind, error: String(e) }); }
+  try {
+    for (const kind of ["facebook", "instagram"] as const) {
+      try { out.push(await syncChannel(kind)); } catch (e) { out.push({ kind, error: String(e) }); }
+    }
+  } finally {
+    await db.from("app_secrets").update({ value: "1970-01-01T00:00:00.000Z" }).eq("key", "meta_sync_lock");
   }
   return json({ ok: true, out });
 });

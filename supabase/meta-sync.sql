@@ -97,9 +97,12 @@ insert into public.app_secrets (key, value)
 values ('sync_key', encode(extensions.gen_random_bytes(18), 'hex'))
 on conflict (key) do nothing;
 
--- select cron.schedule('tesr-meta-sync', '* * * * *', $$
+-- select cron.schedule('tesr-meta-sync', '20 seconds', $$
 --   select net.http_post(
 --     url := 'https://<project-ref>.supabase.co/functions/v1/meta-sync',
 --     headers := jsonb_build_object('Content-Type','application/json','x-sync-key',(select value from public.app_secrets where key='sync_key')),
 --     body := '{}'::jsonb, timeout_milliseconds := 55000)
 -- $$);
+
+-- ล็อกกันรันซ้อน (meta-sync ใช้)
+insert into app_secrets(key, value) values ('meta_sync_lock', '1970-01-01T00:00:00.000Z') on conflict (key) do nothing;
