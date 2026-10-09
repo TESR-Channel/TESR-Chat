@@ -1589,11 +1589,12 @@ async function renderStaffAdmin() {
         <div class="field"><label>อีเมล (ใช้ล็อกอิน)</label><input id="nuEmail" class="inp" type="email"></div>
         <div class="field"><label>ตำแหน่ง</label><input id="nuPos" class="inp" placeholder="เช่น วิศวกร"></div>
         <div class="field"><label>เบอร์โทร</label><input id="nuPhone" class="inp" type="tel" placeholder="08x-xxx-xxxx"></div>
-        <div class="field"><label>รหัสผ่านเริ่มต้น (≥ 8 ตัว)</label><input id="nuPass" class="inp" type="text" value="${rnd(5)}"></div>
+        <div class="field"><label>รหัสผ่านเริ่มต้น (ค่าเริ่มต้น = เบอร์โทร)</label><input id="nuPass" class="inp" type="text" placeholder="ใช้เบอร์โทรอัตโนมัติ"></div>
         <div class="field"><label>สิทธิ์</label><select id="nuRole" class="inp"><option value="agent">พนักงาน</option><option value="admin">แอดมิน</option></select></div>
       </div>
-      <div><button class="btn" id="nuAdd">+ เพิ่มพนักงาน</button></div>
-      <div class="hint">ส่งอีเมลและรหัสผ่านให้พนักงานเอง ระบบไม่ส่งอีเมลให้ · ช่อง "รหัสเริ่มต้น" แอดมินดูได้จนกว่าพนักงานจะกด 🔑 เปลี่ยนรหัสเอง (จากนั้นจะหายไปเพื่อความปลอดภัย)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="nuAdd">+ เพิ่มพนักงาน</button>
+        <button class="btn ghost" id="pwPhoneAll" title="เฉพาะคนที่ยังไม่เคยเปลี่ยนรหัสเอง">📱 ตั้งรหัสเริ่มต้นเป็นเบอร์โทร (ทุกคนที่ยังไม่เปลี่ยนรหัส)</button></div>
+      <div class="hint">รหัสเริ่มต้นคือ<b>เบอร์โทรของพนักงาน (ตัวเลขล้วน เช่น 0812345678)</b> ถ้าไม่ได้กรอกรหัสเอง · ส่งอีเมลและรหัสผ่านให้พนักงานเอง ระบบไม่ส่งอีเมลให้ · ช่อง "รหัสเริ่มต้น" แอดมินดูได้จนกว่าพนักงานจะกด 🔑 เปลี่ยนรหัสเอง (จากนั้นจะหายไปเพื่อความปลอดภัย)</div>
     </div>
     <div style="overflow-x:auto;margin-top:14px"><table>
       <tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>เบอร์โทร</th><th>อีเมล</th><th>รหัสเริ่มต้น</th><th>สิทธิ์</th><th>ใช้งาน</th><th>เข้าใช้ล่าสุด</th><th></th></tr>
@@ -1616,9 +1617,17 @@ async function renderStaffAdmin() {
 
   $("nuAdd").onclick = async () => {
     const r = await adminApi({ action:"create_user", name:$("nuName").value.trim(), email:$("nuEmail").value.trim(),
-      password:$("nuPass").value, role:$("nuRole").value, position:$("nuPos").value.trim(), phone:$("nuPhone").value.trim() });
+      password:$("nuPass").value.trim(), role:$("nuRole").value, position:$("nuPos").value.trim(), phone:$("nuPhone").value.trim() });
     toast(r?.msg || "เสร็จ");
     if (r?.ok) { await loadStaff(); renderStaffAdmin(); }
+  };
+  $("pwPhoneAll").onclick = async (e) => {
+    const b = e.currentTarget;
+    if (b.dataset.sure !== "1") { b.dataset.sure = "1"; b.textContent = "กดอีกครั้งเพื่อยืนยัน"; setTimeout(() => { b.dataset.sure = ""; b.textContent = "📱 ตั้งรหัสเริ่มต้นเป็นเบอร์โทร (ทุกคนที่ยังไม่เปลี่ยนรหัส)"; }, 4000); return; }
+    b.disabled = true;
+    const r = await adminApi({ action:"reset_to_phone" });
+    toast(r?.msg || "เสร็จ", 6000);
+    renderStaffAdmin();
   };
   $("setBody").querySelectorAll("tr[data-id]").forEach(tr => {
     const id = tr.dataset.id;
@@ -1629,7 +1638,8 @@ async function renderStaffAdmin() {
       toast("บันทึกแล้ว"); loadStaff();
     });
     tr.querySelector("[data-pw]").onclick = async () => {
-      const pw = prompt("รหัสผ่านใหม่ (อย่างน้อย 8 ตัว)", rnd(5)); if (!pw) return;
+      const tel = (tr.querySelector('[data-f="phone"]').value || "").replace(/\D/g, "");
+      const pw = prompt("รหัสผ่านใหม่ (อย่างน้อย 8 ตัว) — ค่าเริ่มต้นคือเบอร์โทร", tel.length >= 8 ? tel : rnd(5)); if (!pw) return;
       const r = await adminApi({ action:"reset_password", user_id:id, password:pw });
       toast(r?.ok ? `เปลี่ยนแล้ว: ${pw}` : (r?.msg || "ไม่สำเร็จ"));
       if (r?.ok) renderStaffAdmin();

@@ -175,9 +175,11 @@ Deno.serve(async (req) => {
         })) });
       }
       case "create_user": {
-        const { email, password, name, role } = b;
-        if (!email || !password || password.length < 8) {
-          return json({ ok: false, msg: "ต้องมีอีเมล และรหัสผ่านอย่างน้อย 8 ตัว" }, 400);
+        const { email, name, role } = b;
+        // รหัสเริ่มต้น = เบอร์โทร (ตัวเลขล้วน) ถ้าไม่ได้กำหนดรหัสมาเอง
+        const password = String(b.password || "").trim() || String(b.phone ?? "").replace(/\D/g, "");
+        if (!email || password.length < 8) {
+          return json({ ok: false, msg: "ต้องมีอีเมล และเบอร์โทร (ใช้เป็นรหัสเริ่มต้น) หรือรหัสผ่านอย่างน้อย 8 ตัว" }, 400);
         }
         const { data, error } = await db.auth.admin.createUser({
           email, password, email_confirm: true, user_metadata: { name: name || email.split("@")[0] },
@@ -201,6 +203,31 @@ Deno.serve(async (req) => {
         await db.from("staff_initial_pw").upsert({ staff_id: b.user_id, password: b.password, set_by: admin.id, set_at: new Date().toISOString() });
         await db.from("activity_log").insert({ actor: admin.id, action: "รีเซ็ตรหัสผ่านพนักงาน", detail: { user: b.user_id } });
         return json({ ok: true, msg: "เปลี่ยนรหัสผ่านแล้ว" });
+      }
+      case "reset_to_phone": {
+        // ตั้งรหัสผ่านเป็นเบอร์โทร (ตัวเลขล้วน) — เฉพาะคนที่ยังใช้รหัสเริ่มต้น (ยังไม่เคยเปลี่ยนรหัสเอง)
+        // หรือระบุ user_id มาคนเดียว
+        let q = db.from("staff").select("id, display_name, phone");
+        if (b.user_id) q = q.eq("id", b.user_id);
+        const { data: list } = await q;
+        const { data: init } = await db.from("staff_initial_pw").select("staff_id");
+        const still = new Set((init ?? []).map((r) => r.staff_id));
+        const done: string[] = [], skip: string[] = [];
+        for (const s of list ?? []) {
+          const pw = String(s.phone ?? "").replace(/\D/g, "");
+          if (!b.user_id && !still.has(s.id)) continue; // เปลี่ยนรหัสเองแล้ว ไม่ไปยุ่ง
+          if (pw.length < 8) { skip.push(`${s.display_name} (ไม่มีเบอร์โทร)`); continue; }
+          const { error } = await db.auth.admin.updateUserById(s.id, { password: pw });
+          if (error) { skip.push(`${s.display_name} (${error.message})`); continue; }
+          await db.from("staff_initial_pw").upsert({ staff_id: s.id, password: pw, set_by: admin.id, set_at: new Date().toISOString() });
+          done.push(s.display_name);
+        }
+        await db.from("activity_log").insert({ actor: admin.id, action: "ตั้งรหัสผ่านเป็นเบอร์โทร", detail: { done, skip } });
+        return json({
+          ok: done.length > 0 || !skip.length,
+          msg: (done.length ? `ตั้งรหัสเป็นเบอร์โทรแล้ว ${done.length} คน` : "ไม่มีใครต้องเปลี่ยน") +
+            (skip.length ? ` · ข้าม: ${skip.join(", ")}` : ""),
+        });
       }
       default:
         return json({ ok: false, msg: "unknown action" }, 400);
