@@ -1117,6 +1117,7 @@ $("composer").onsubmit = (e) => {
   const contact = S.current;
   // หลายไฟล์ = หลายข้อความ ส่งตามลำดับ (ข้อความที่พิมพ์ไปกับไฟล์แรก)
   const jobs = items.length ? items.map((x, i) => ({ text: i === 0 ? text : "", ...x })) : [{ text, file: null, thumb: null }];
+  const tmps = [];
   for (const j of jobs) {
     const f = j.file;
     const kind = !f ? "text" : f.type.startsWith("image/") ? "image"
@@ -1127,37 +1128,67 @@ $("composer").onsubmit = (e) => {
       sent_by:S.me.id, send_status:"sending", created_at:new Date().toISOString(),
     };
     if (S.msgs && S.current?.id === contact.id) S.msgs.push(tmp);
-    sendQueue = sendQueue.then(() => sendNow(contact, j.text, f, j.thumb, kind, tmp)).catch(() => {});
+    tmps.push({ j, f, kind, tmp });
+  }
+  // LINE: หลายไฟล์ส่งรวมในคำขอเดียว → ใช้ Reply (ฟรี) ได้ทั้งชุด สูงสุด 5 รายการต่อครั้ง ไม่ต้องเปลือง Push ทีละไฟล์
+  if (contact.channel === "line" && tmps.length > 1) {
+    sendQueue = sendQueue.then(() => sendBatch(contact, text, tmps)).catch(() => {});
+  } else {
+    for (const { j, f, kind, tmp } of tmps) sendQueue = sendQueue.then(() => sendNow(contact, j.text, f, j.thumb, kind, tmp)).catch(() => {});
   }
   if (S.msgs && S.current?.id === contact.id) renderMsgs();
   ta.value = ""; ta.style.height = "auto"; clearAttach(true); ta.focus();
 };
 
+// อัปโหลดไฟล์ขึ้น Storage แล้วคืนข้อมูลสำหรับส่ง
+async function uploadOut(file, thumb, kind) {
+  const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const path = `out/${new Date().toISOString().slice(0,7)}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from("media").upload(path, file, { contentType:file.type || undefined });
+  if (error) throw new Error("อัปโหลดไม่สำเร็จ: " + error.message);
+  const it = { media_url:sb.storage.from("media").getPublicUrl(path).data.publicUrl, file_name:file.name, media_kind:kind };
+  if (kind === "video" && thumb) { // หน้าปกวิดีโอ (LINE ใช้)
+    const tp = path.replace(/\.[a-z0-9]+$/, "") + "-preview.jpg";
+    const up = await sb.storage.from("media").upload(tp, thumb, { contentType: "image/jpeg" });
+    if (!up.error) it.preview_url = sb.storage.from("media").getPublicUrl(tp).data.publicUrl;
+  }
+  return it;
+}
+async function invokeSend(payload) {
+  const { data, error } = await sb.functions.invoke("send-message", { body:payload });
+  if (error) {
+    let msg = error.message;
+    try { msg = (await error.context.json()).error || msg; } catch (_) {}
+    throw new Error(msg);
+  }
+  if (!data?.ok) throw new Error(data?.error || "ส่งไม่สำเร็จ");
+  return data;
+}
+// ส่งหลายไฟล์ของ LINE ในคำขอเดียว
+async function sendBatch(contact, text, list) {
+  const dropAll = () => { if (S.msgs) S.msgs = S.msgs.filter(m => !list.some(x => x.tmp === m)); };
+  try {
+    const items = [];
+    for (const { f, j, kind } of list) if (f) items.push(await uploadOut(f, j.thumb, kind));
+    await invokeSend({ contact_id:contact.id, text, items });
+    dropAll();
+  } catch (err) {
+    if (/อัปโหลด|Failed to fetch|NetworkError/i.test(err.message)) {
+      list.forEach(({ tmp }) => { tmp.send_status = "failed"; tmp.send_error = err.message; });
+      if (!ta.value && text) ta.value = text;
+    } else dropAll();
+    toast(err.message);
+  } finally {
+    if (S.current?.id === contact.id && S.msgs) renderMsgs();
+  }
+}
+
 async function sendNow(contact, text, file, thumb, kind, tmp) {
   const drop = () => { if (S.msgs) { const i = S.msgs.indexOf(tmp); if (i >= 0) S.msgs.splice(i, 1); } };
   try {
     const payload = { contact_id:contact.id, text };
-    if (file) {
-      const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
-      const path = `out/${new Date().toISOString().slice(0,7)}/${crypto.randomUUID()}.${ext}`;
-      const { error } = await sb.storage.from("media").upload(path, file, { contentType:file.type || undefined });
-      if (error) throw new Error("อัปโหลดไม่สำเร็จ: " + error.message);
-      payload.media_url = sb.storage.from("media").getPublicUrl(path).data.publicUrl;
-      payload.file_name = file.name;
-      payload.media_kind = kind;
-      if (kind === "video" && thumb) { // หน้าปกวิดีโอ (LINE ใช้)
-        const tp = path.replace(/\.[a-z0-9]+$/, "") + "-preview.jpg";
-        const up = await sb.storage.from("media").upload(tp, thumb, { contentType: "image/jpeg" });
-        if (!up.error) payload.preview_url = sb.storage.from("media").getPublicUrl(tp).data.publicUrl;
-      }
-    }
-    const { data, error } = await sb.functions.invoke("send-message", { body:payload });
-    if (error) {
-      let msg = error.message;
-      try { msg = (await error.context.json()).error || msg; } catch (_) {}
-      throw new Error(msg);
-    }
-    if (!data?.ok) throw new Error(data?.error || "ส่งไม่สำเร็จ");
+    if (file) Object.assign(payload, await uploadOut(file, thumb, kind));
+    await invokeSend(payload);
     drop(); // ข้อความจริงเข้ามาทาง realtime แล้ว (หรือกำลังจะเข้า)
   } catch (err) {
     // ระบบบันทึกข้อความที่ส่งไม่สำเร็จไว้แล้ว (ขึ้นกรอบแดง) — ตัวชั่วคราวลบทิ้ง
