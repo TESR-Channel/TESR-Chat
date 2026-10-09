@@ -220,8 +220,25 @@ header{padding-top:env(safe-area-inset-top);height:calc(52px + env(safe-area-ins
 #app{grid-template-rows:calc(52px + env(safe-area-inset-top)) 1fr}
 .composer{padding-bottom:calc(10px + env(safe-area-inset-bottom))}
 header nav button .ico{margin-right:4px}
-.installbtn{display:none}
-.installbtn.show{display:inline-flex}
+.installbtn{display:none!important}
+.installbtn.show{display:flex!important}
+header .me{position:relative}
+.acct-btn{display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:5px 12px 5px 10px;font:inherit;font-size:13px;cursor:pointer;max-width:240px}
+.acct-btn:hover,.acct-btn[aria-expanded="true"]{border-color:var(--brand)}
+.acct-btn #meName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-btn .caret{color:var(--muted);font-size:11px}
+.acct-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:60;width:min(300px,calc(100vw - 24px));background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px;display:grid;gap:2px;color:var(--ink)}
+.acct-head{display:grid;gap:2px;padding:8px 10px 10px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.acct-head small{color:var(--muted);font-size:12px}
+.acct-item{display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;background:none;border:0;border-radius:10px;padding:8px 10px;color:inherit;font:inherit;cursor:pointer}
+.acct-item:hover,.acct-item:focus-visible{background:var(--bg);outline:none}
+.acct-item .ai{font-size:18px;width:24px;text-align:center;flex:none;line-height:1.3}
+.acct-item .at{display:grid;gap:1px;min-width:0}
+.acct-item .at b{font-size:14px;font-weight:600}
+.acct-item .at small{font-size:12px;color:var(--muted);line-height:1.35}
+.acct-item.danger .at b{color:var(--bad)}
+.acct-pw{display:grid;gap:6px;padding:4px 10px 10px}
+.acct-pw-act{display:flex;gap:6px;flex-wrap:wrap}
 @media (hover:none){ .item:hover{background:inherit} .item.on{background:var(--sel)} }
 
 /* tablet */
@@ -237,7 +254,7 @@ header nav button .ico{margin-right:4px}
   header nav button .txt{display:none}
   header nav button .ico{margin:0}
   header .brand > span:not(.mark){display:none}
-  header .me{gap:6px} header .me span{display:none}
+  header .me{gap:6px} .acct-btn #meName,.acct-btn .caret{display:none} .acct-btn{padding:6px 9px}
   header .me{min-width:0;flex-shrink:1}
   .themebtn{width:32px;height:32px;font-size:15px}
   #logout{padding:4px 8px!important;font-size:13px}
@@ -278,12 +295,28 @@ header nav button .ico{margin-right:4px}
       <button data-view="dash" title="สถิติทีม"><span class="ico">📊</span><span class="txt">สถิติทีม</span></button>
       <button data-view="settings" id="navSettings" class="hidden" title="ตั้งค่า"><span class="ico">⚙</span><span class="txt">ตั้งค่า</span></button>
     </nav>
-    <div class="me"><i id="liveDot" class="live-dot" title="กำลังเชื่อมต่อ…"></i><span id="meName"></span>
-      <button class="themebtn installbtn" id="installBtn" type="button" title="ติดตั้งเป็นแอป">📲</button>
-      <button class="themebtn" id="bellBtn" type="button" title="การแจ้งเตือน">🔔</button>
-      <button class="themebtn" id="pwBtn" type="button" title="เปลี่ยนรหัสผ่านของฉัน">🔑</button>
-      <button class="themebtn" id="themeBtn" type="button" title="สลับธีม"></button>
-      <button class="btn ghost" id="logout" style="padding:5px 10px">ออก</button></div>
+    <div class="me">
+      <button class="acct-btn" id="acctBtn" type="button" aria-haspopup="menu" aria-expanded="false" title="บัญชีของฉัน และการตั้งค่าส่วนตัว">
+        <i id="liveDot" class="live-dot" title="กำลังเชื่อมต่อ…"></i><span class="acct-ic">👤</span><span id="meName"></span><span class="caret">▾</span></button>
+      <div class="acct-menu hidden" id="acctMenu" role="menu">
+        <div class="acct-head"><b id="acctName"></b><small id="acctLive">กำลังเชื่อมต่อ…</small></div>
+        <button class="acct-item" id="bellBtn" type="button" role="menuitem"><span class="ai" id="bellIco">🔔</span>
+          <span class="at"><b>การแจ้งเตือน</b><small id="bellDesc"></small></span></button>
+        <button class="acct-item installbtn" id="installBtn" type="button" role="menuitem"><span class="ai">📲</span>
+          <span class="at"><b>ติดตั้งเป็นแอป</b><small>เปิดจากหน้าจอโฮม และรับแจ้งเตือนแม้ปิดเว็บ</small></span></button>
+        <button class="acct-item" id="themeBtn" type="button" role="menuitem"><span class="ai" id="themeIco"></span>
+          <span class="at"><b>ธีมหน้าจอ</b><small id="themeDesc"></small></span></button>
+        <button class="acct-item" id="pwBtn" type="button" role="menuitem"><span class="ai">🔑</span>
+          <span class="at"><b>เปลี่ยนรหัสผ่าน</b><small>ตั้งรหัสใหม่ของบัญชีคุณเอง</small></span></button>
+        <form class="acct-pw hidden" id="pwForm" autocomplete="off">
+          <input class="inp" id="pw1" type="password" placeholder="รหัสผ่านใหม่ (อย่างน้อย 8 ตัว)" autocomplete="new-password">
+          <input class="inp" id="pw2" type="password" placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง" autocomplete="new-password">
+          <div class="acct-pw-act"><button class="btn" type="submit">บันทึกรหัสใหม่</button><button class="btn ghost" type="button" id="pwCancel">ยกเลิก</button></div>
+        </form>
+        <button class="acct-item danger" id="logout" type="button" role="menuitem"><span class="ai">🚪</span>
+          <span class="at"><b>ออกจากระบบ</b><small>ออกจากเครื่องนี้ และหยุดแจ้งเตือนที่เครื่องนี้</small></span></button>
+      </div>
+    </div>
   </header>
 
   <!-- inbox -->
@@ -438,8 +471,8 @@ function getTheme() { try { return localStorage.getItem("tesr-theme") || "auto";
 function setTheme(t) {
   if (t === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
   try { localStorage.setItem("tesr-theme", t); } catch (_) {}
-  $("themeBtn").textContent = THEME_ICON[t];
-  $("themeBtn").title = `ธีม: ${THEME_NAME[t]} (กดเพื่อสลับ)`;
+  $("themeIco").textContent = THEME_ICON[t];
+  $("themeDesc").textContent = `ตอนนี้: ${THEME_NAME[t]} · กดเพื่อสลับ`;
 }
 $("themeBtn").onclick = () => {
   const t = THEMES[(THEMES.indexOf(getTheme()) + 1) % THEMES.length];
@@ -478,13 +511,27 @@ $("installBtn").onclick = async () => {
 };
 
 // เปลี่ยนรหัสผ่านของตัวเอง
-$("pwBtn").onclick = async () => {
-  const p1 = prompt("ตั้งรหัสผ่านใหม่ (อย่างน้อย 8 ตัว)"); if (!p1) return;
+// เมนูบัญชี (มุมขวาบน): แจ้งเตือน / ติดตั้งแอป / ธีม / เปลี่ยนรหัสผ่าน / ออก
+function acctMenu(open) {
+  const m = $("acctMenu"), b = $("acctBtn");
+  open = open ?? m.classList.contains("hidden");
+  m.classList.toggle("hidden", !open); b.setAttribute("aria-expanded", String(open));
+  if (!open) { $("pwForm").classList.add("hidden"); $("pwForm").reset(); }
+}
+$("acctBtn").onclick = (e) => { e.stopPropagation(); acctMenu(); };
+document.addEventListener("click", (e) => { if (!e.target.closest("#acctMenu, #acctBtn")) acctMenu(false); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") acctMenu(false); });
+$("pwBtn").onclick = () => { $("pwForm").classList.toggle("hidden"); $("pw1").focus(); };
+$("pwCancel").onclick = () => { $("pwForm").classList.add("hidden"); $("pwForm").reset(); };
+$("pwForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const p1 = $("pw1").value, p2 = $("pw2").value;
   if (p1.length < 8) return toast("รหัสผ่านต้องมีอย่างน้อย 8 ตัว");
-  const p2 = prompt("พิมพ์รหัสผ่านใหม่อีกครั้ง"); if (p1 !== p2) return toast("รหัสผ่านไม่ตรงกัน");
+  if (p1 !== p2) return toast("รหัสผ่านทั้ง 2 ช่องไม่ตรงกัน");
   const { error } = await sb.auth.updateUser({ password:p1 });
   if (error) return toast("เปลี่ยนไม่สำเร็จ: " + error.message);
   await sb.rpc("clear_my_initial_password"); // ลบรหัสชั่วคราวที่แอดมินเห็นทิ้ง
+  acctMenu(false);
   toast("เปลี่ยนรหัสผ่านแล้ว ✓");
 };
 
@@ -559,11 +606,11 @@ async function dropPushSub() {
 }
 function renderBell() {
   const on = NOTIF.on(), perm = "Notification" in window ? Notification.permission : "denied";
-  $("bellBtn").textContent = on ? "🔔" : "🔕";
-  $("bellBtn").title = !on ? "ปิดแจ้งเตือนอยู่ (กดเพื่อเปิด)"
-    : perm === "granted" ? "เปิดแจ้งเตือน + เสียง (กดเพื่อปิด)"
-    : perm === "denied" ? "เบราว์เซอร์บล็อกการแจ้งเตือน มีแค่เสียง (เปิดสิทธิ์ที่ตั้งค่าเว็บไซต์)"
-    : "กดเพื่ออนุญาตการแจ้งเตือน";
+  $("bellIco").textContent = on ? "🔔" : "🔕";
+  $("bellDesc").textContent = !on ? "ปิดอยู่ · กดเพื่อเปิดเสียงและแจ้งเตือน"
+    : perm === "granted" ? "เปิดอยู่ (เสียง + แจ้งเตือนเด้ง) · กดเพื่อปิด"
+    : perm === "denied" ? "เบราว์เซอร์บล็อกไว้ มีแค่เสียง · เปิดสิทธิ์ในตั้งค่าเว็บไซต์"
+    : "กดเพื่ออนุญาตให้แจ้งเตือนเด้ง";
 }
 $("bellBtn").onclick = async () => {
   unlockAudio();
@@ -621,7 +668,7 @@ async function boot(user) {
   // กันเบราว์เซอร์กรอกอีเมลลงช่องค้นหาอัตโนมัติ (ทำให้รายการแชตว่าง)
   const clearAutofill = () => { if ($("q").value.includes("@") || $("q").value === user.email) { $("q").value = ""; renderList(); } };
   clearAutofill(); setTimeout(clearAutofill, 400); setTimeout(clearAutofill, 1500);
-  $("meName").textContent = me.display_name;
+  $("meName").textContent = me.display_name; $("acctName").textContent = me.display_name;
   $("login").classList.add("hidden"); $("app").classList.remove("hidden");
   await loadStaff();
   buildFilters();
@@ -1177,6 +1224,7 @@ function setLive(on) {
   const d = $("liveDot"); if (!d) return;
   d.classList.toggle("on", on);
   d.title = on ? "ข้อความเข้าแบบสด" : "กำลังเชื่อมต่อใหม่…";
+  const a = $("acctLive"); if (a) a.textContent = on ? "🟢 ออนไลน์ · ข้อความเข้าแบบสด" : "🟠 กำลังเชื่อมต่อใหม่…";
 }
 function resubscribe(delay = 0) {
   clearTimeout(RT.t);
@@ -1597,7 +1645,7 @@ async function renderStaffAdmin() {
       <div class="hint">รหัสเริ่มต้นคือ<b>เบอร์โทรของพนักงาน (ตัวเลขล้วน เช่น 0812345678)</b> ถ้าไม่ได้กรอกรหัสเอง · ส่งอีเมลและรหัสผ่านให้พนักงานเอง ระบบไม่ส่งอีเมลให้ · ช่อง "รหัสเริ่มต้น" แอดมินดูได้จนกว่าพนักงานจะกด 🔑 เปลี่ยนรหัสเอง (จากนั้นจะหายไปเพื่อความปลอดภัย)</div>
     </div>
     <div style="overflow-x:auto;margin-top:14px"><table>
-      <tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>เบอร์โทร</th><th>อีเมล</th><th>รหัสเริ่มต้น</th><th>สิทธิ์</th><th>ใช้งาน</th><th>เข้าใช้ล่าสุด</th><th></th></tr>
+      <tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>เบอร์โทร</th><th>อีเมล</th><th title="แอดมินเห็นได้จนกว่าพนักงานจะเปลี่ยนรหัสเอง">รหัสเริ่มต้น</th><th>สิทธิ์</th><th title="เอาติ๊กออก = ปิดบัญชี ล็อกอินไม่ได้">ใช้งาน</th><th>เข้าใช้ล่าสุด</th><th>ลืมรหัส</th></tr>
       ${(staff || []).map(s => `<tr data-id="${s.id}">
         <td><input class="inp" data-f="display_name" value="${esc(s.display_name)}" style="padding:5px 8px;min-width:140px"></td>
         <td><input class="inp" data-f="position" value="${esc(s.position || "")}" style="padding:5px 8px;min-width:100px"></td>
@@ -1611,9 +1659,10 @@ async function renderStaffAdmin() {
         <td><select class="inp" data-f="role" style="padding:5px 8px"><option value="agent"${s.role === "agent" ? " selected" : ""}>พนักงาน</option><option value="admin"${s.role === "admin" ? " selected" : ""}>แอดมิน</option></select></td>
         <td><input type="checkbox" data-f="active"${s.active ? " checked" : ""} style="width:18px;height:18px;accent-color:var(--brand)"></td>
         <td style="font-size:13px;color:var(--muted)">${emails[s.id]?.last_sign_in_at ? dayLabel(emails[s.id].last_sign_in_at) : "–"}</td>
-        <td><button class="btn ghost" data-pw style="padding:4px 10px;font-size:13px">ตั้งรหัสใหม่</button></td>
+        <td><button class="btn ghost" data-pw title="ตั้งรหัสผ่านใหม่ให้พนักงานคนนี้ (ค่าเริ่มต้นคือเบอร์โทร) ใช้ตอนพนักงานลืมรหัส" style="padding:4px 10px;font-size:13px;white-space:nowrap">🔑 รีเซ็ตรหัส</button></td>
       </tr>`).join("")}
-    </table></div>`;
+    </table></div>
+    <div class="hint" style="margin-top:8px">แก้ชื่อ ตำแหน่ง เบอร์โทร หรือสิทธิ์ในตารางได้เลย ระบบบันทึกให้ทันที · พนักงานเปลี่ยนรหัสของตัวเองได้ที่เมนู <b>👤 ชื่อตัวเอง ▾ › เปลี่ยนรหัสผ่าน</b> มุมขวาบน · ปุ่ม <b>🔑 รีเซ็ตรหัส</b> ใช้ตอนพนักงานลืมรหัส</div>`;
 
   $("nuAdd").onclick = async () => {
     const r = await adminApi({ action:"create_user", name:$("nuName").value.trim(), email:$("nuEmail").value.trim(),
