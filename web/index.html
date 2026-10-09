@@ -69,7 +69,7 @@ button{cursor:pointer}
 .err{color:var(--bad);font-size:13px;min-height:1em}
 
 /* app shell */
-#app{height:100%;display:grid;grid-template-rows:52px 1fr}
+#app{height:100%;display:grid;grid-template-rows:52px auto 1fr}
 header{display:flex;align-items:center;gap:12px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line)}
 header .logo{font-weight:700;font-size:17px}
 header .logo b{color:var(--brand)}
@@ -233,12 +233,15 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .banner .bb{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .banner .bx{border:0;background:none;color:var(--muted);font-size:14px;padding:4px}
 @keyframes bin{from{opacity:0;transform:translateY(-12px)}}
+#healthBar{z-index:40;background:var(--badbg);color:var(--badfg);padding:8px 14px;font-size:13px;display:grid;gap:3px;border-bottom:1px solid var(--line)}
+#healthBar b{font-size:13.5px}
+#healthBar .hb-fix{opacity:.85}
 .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:10px;font-size:14px;z-index:50}
 
 /* ---------- รองรับทุกอุปกรณ์ (มือถือ / แท็บเล็ต / เดสก์ท็อป / ติดตั้งเป็นแอป) ---------- */
 @supports (height:100dvh){ #app{height:100dvh} }
 header{padding-top:env(safe-area-inset-top);height:calc(52px + env(safe-area-inset-top))}
-#app{grid-template-rows:calc(52px + env(safe-area-inset-top)) 1fr}
+#app{grid-template-rows:calc(52px + env(safe-area-inset-top)) auto 1fr}
 .composer{padding-bottom:calc(10px + env(safe-area-inset-bottom))}
 header nav button .ico{margin-right:4px}
 .installbtn{display:none!important}
@@ -339,6 +342,7 @@ header .me{position:relative}
       </div>
     </div>
   </header>
+  <div id="healthBar" class="hidden"></div>
 
   <!-- inbox -->
   <main class="inbox" id="inboxView">
@@ -690,6 +694,7 @@ async function boot(user) {
   $("staffTblTitle").textContent = me.is_owner ? "รายบุคคล (ทุกคน)" : "สถิติของฉัน";
   const { data: st } = await sb.from("app_settings").select("key,value");
   S.settings = Object.fromEntries((st || []).map(r => [r.key, r.value]));
+  renderHealth(S.settings.channel_health);
   if (S.settings.slow_reply_min) SLOW = Number(S.settings.slow_reply_min) * 60;
   applyBrand(S.settings.logo_url || null);
   // กันเบราว์เซอร์กรอกอีเมลลงช่องค้นหาอัตโนมัติ (ทำให้รายการแชตว่าง)
@@ -812,7 +817,7 @@ function renderHead() {
         ${c.business_unit ? " · " + esc(UNITS[c.business_unit]) : ""}
         ${c.assigned_to ? " · ผู้ดูแล: " + esc(S.staff[c.assigned_to]?.display_name || "") : ""}</div>
     </div>
-    ${c.awaiting_since ? `<button class="btn ghost" id="noReplyBtn" title="ลูกค้าแค่ตอบรับ/ขอบคุณ ไม่ต้องตอบกลับ — เอาออกจากรายการรอตอบ (ไม่นับเป็นตอบช้าใน KPI)" style="padding:5px 10px;font-size:13px;white-space:nowrap">✓ ไม่ต้องตอบ</button>` : ""}
+    ${c.awaiting_since ? `<button class="btn ghost" id="noReplyBtn" title="ตอบลูกค้าไปแล้วทางอื่น (เช่นจากแอป LINE) หรือลูกค้าแค่ตอบรับ ไม่ต้องตอบกลับ — เอาออกจากรายการรอตอบ (ไม่นับเป็นตอบช้าใน KPI)" style="padding:5px 10px;font-size:13px;white-space:nowrap">✓ ตอบแล้ว/ไม่ต้องตอบ</button>` : ""}
     <button class="iconbtn" id="infoBtn" title="ข้อมูลลูกค้า / โน้ต">&#x2139;&#xFE0E;</button>`;
   $("backBtn2").onclick = () => { $("inboxView").classList.remove("chatting"); S.current = null; renderList(); };
   $("infoBtn").onclick = () => $("infoCol").classList.toggle("closed");
@@ -1299,9 +1304,37 @@ function resubscribe(delay = 0) {
   RT.t = setTimeout(subscribe, delay);
 }
 // ดึงรายชื่อแชต + ข้อความของแชตที่เปิดอยู่ใหม่ (เก็บข้อความที่กำลังส่ง/ส่งไม่สำเร็จไว้)
+// แถบเตือนบนสุด: ช่องทางไหนรับข้อความไม่ได้ (health-check ตรวจทุก 5 นาที)
+const CH_LABEL = { line:"LINE", facebook:"Facebook", instagram:"Instagram" };
+function renderHealth(h) {
+  const el = $("healthBar"); if (!el) return;
+  const probs = h?.problems || [];
+  if (!probs.length) { el.classList.add("hidden"); el.innerHTML = ""; return; }
+  el.classList.remove("hidden");
+  el.innerHTML = probs.map(p => `<div>⚠️ <b>${esc(CH_LABEL[p.channel] || p.channel)}:</b> ${esc(p.msg)}${p.fix ? ` <span class="hb-fix">· วิธีแก้: ${esc(p.fix)}</span>` : ""}</div>`).join("");
+}
+async function refreshHealth() {
+  try {
+    const { data } = await sb.from("app_settings").select("value").eq("key", "channel_health").maybeSingle();
+    if (data) { S.settings.channel_health = data.value; renderHealth(data.value); }
+  } catch (_) {}
+}
+// แอปที่เปิดค้างไว้นาน: ถ้ามีเวอร์ชันใหม่บนเซิร์ฟเวอร์ ให้โหลดใหม่เองตอนกลับมาเปิด (เว้นแต่กำลังพิมพ์ค้างอยู่)
+let APP_ETAG = null;
+async function checkAppVersion() {
+  try {
+    const r = await fetch("./index.html", { method:"HEAD", cache:"no-store" });
+    const tag = r.headers.get("etag") || r.headers.get("last-modified");
+    if (!tag) return;
+    if (APP_ETAG === null) { APP_ETAG = tag; return; }
+    if (tag !== APP_ETAG && !$("text").value.trim()) { toast("มีเวอร์ชันใหม่ กำลังโหลดใหม่…"); setTimeout(() => location.reload(), 800); }
+  } catch (_) {}
+}
+checkAppVersion();
 async function catchUp() {
   if (RT.busy || !S.me) return;
   RT.busy = true; RT.last = Date.now();
+  refreshHealth();
   try {
     await loadContacts();
     const id = S.current?.id;
@@ -1322,6 +1355,7 @@ async function catchUp() {
 }
 document.addEventListener("visibilitychange", () => {
   if (document.hidden || !S.me) return;
+  checkAppVersion();
   if (!RT.ok) resubscribe(0);
   if (Date.now() - RT.last > 5000) catchUp();
 });

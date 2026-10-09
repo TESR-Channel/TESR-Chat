@@ -97,23 +97,70 @@ async function handleEvent(ev: any, token: string) {
     p_type: type, p_text: text, p_media: media, p_file_name: fileName,
     p_mid: m.id, p_raw: ev, p_reply_token: ev.replyToken ?? null,
   });
-  if (error) console.error("ingest", error);
-  else if (contactId) await notifyStaff({ contactId, channel: "line", name: prof.name, text, type, sender });
+  if (error) throw new Error(`ingest: ${error.message}`); // ให้ cron ทำซ้ำ
+  if (contactId) await notifyStaff({ contactId, channel: "line", name: prof.name, text, type, sender });
+}
+
+// ประมวลผล event ที่เก็บไว้ในตาราง webhook_events (เรียกจาก waitUntil หลังตอบ LINE แล้ว และจาก cron ซ้ำถ้าพลาด)
+async function processRows(rows: { id: number; payload: any; attempts: number }[], token: string) {
+  for (const r of rows) {
+    try {
+      await handleEvent(r.payload, token);
+      await db.from("webhook_events").update({ processed_at: new Date().toISOString(), last_error: null }).eq("id", r.id);
+    } catch (e) {
+      console.error("line event", r.id, e);
+      await db.from("webhook_events").update({ attempts: r.attempts + 1, last_error: String((e as Error).message ?? e).slice(0, 500) }).eq("id", r.id);
+    }
+  }
+}
+
+async function secret(key: string) {
+  const { data } = await db.from("app_secrets").select("value").eq("key", key).maybeSingle();
+  return (data?.value as string | undefined) ?? null;
 }
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return new Response("TESR Chat LINE webhook OK");
+  const u = new URL(req.url);
   const cfg = await getChannel("line");
-  const secret = cfg.secrets.channel_secret, token = cfg.secrets.channel_access_token;
-  if (!secret || !token) return new Response("LINE not configured", { status: 503 });
+  const secretKey = cfg.secrets.channel_secret, token = cfg.secrets.channel_access_token;
+
+  // cron: ทำซ้ำ event ที่ยังไม่ถูกประมวลผล (เช่น ฟังก์ชันล่ม/หมดเวลา ระหว่างทาง)
+  if (u.searchParams.get("reprocess") === "1") {
+    const k = req.headers.get("x-sync-key") ?? u.searchParams.get("k");
+    if (!k || k !== (await secret("sync_key"))) return new Response("forbidden", { status: 403 });
+    if (!token) return new Response("LINE not configured", { status: 503 });
+    const { data: rows } = await db.from("webhook_events").select("id, payload, attempts")
+      .eq("channel", "line").is("processed_at", null).lt("attempts", 10)
+      .lt("received_at", new Date(Date.now() - 45_000).toISOString()).order("id").limit(50);
+    await processRows(rows ?? [], token);
+    return new Response(JSON.stringify({ ok: true, reprocessed: rows?.length ?? 0 }), { headers: { "Content-Type": "application/json" } });
+  }
+
+  if (req.method !== "POST") return new Response("TESR Chat LINE webhook OK");
+  if (!secretKey || !token) return new Response("LINE not configured", { status: 503 });
 
   const body = await req.text();
   const sig = req.headers.get("x-line-signature") ?? "";
-  const expected = btoa(String.fromCharCode(...await hmacSha256(secret, body)));
+  const expected = btoa(String.fromCharCode(...await hmacSha256(secretKey, body)));
   if (!safeEqual(expected, sig)) return new Response("bad signature", { status: 401 });
 
   const { events = [] } = JSON.parse(body);
   if (!cfg.enabled) return new Response("ok (disabled)"); // ปิดช่องทางไว้: ตอบ 200 แต่ไม่บันทึก
-  await Promise.allSettled(events.map((e: any) => handleEvent(e, token)));
+
+  // 1) เก็บดิบลงฐานข้อมูลก่อน (เร็ว) — ซ้ำจาก webhook redelivery จะถูกข้ามด้วย webhookEventId
+  const { data: rows, error } = await db.from("webhook_events")
+    .upsert(events.map((e: any) => ({ channel: "line", event_id: e.webhookEventId ?? crypto.randomUUID(), payload: e })),
+      { onConflict: "channel,event_id", ignoreDuplicates: true })
+    .select("id, payload, attempts");
+  if (error) { // เก็บไม่ได้ → ประมวลผลตรง ๆ แบบเดิม (และตอบ non-2xx ถ้าพัง เพื่อให้ LINE ส่งซ้ำ)
+    console.error("webhook_events", error);
+    const res = await Promise.allSettled(events.map((e: any) => handleEvent(e, token)));
+    return new Response(res.some((r) => r.status === "rejected") ? "partial" : "ok", { status: res.some((r) => r.status === "rejected") ? 500 : 200 });
+  }
+  // 2) ตอบ LINE ทันที แล้วประมวลผลต่อเบื้องหลัง
+  const work = processRows(rows ?? [], token);
+  // deno-lint-ignore no-explicit-any
+  const rt = (globalThis as any).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(work); else await work;
   return new Response("ok");
 });

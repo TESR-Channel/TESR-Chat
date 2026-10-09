@@ -106,3 +106,8 @@ on conflict (key) do nothing;
 
 -- ล็อกกันรันซ้อน (meta-sync ใช้)
 insert into app_secrets(key, value) values ('meta_sync_lock', '1970-01-01T00:00:00.000Z') on conflict (key) do nothing;
+
+-- ตาราง webhook_events (เก็บ webhook ดิบก่อนประมวลผล) + cron ทำซ้ำ + ตรวจสุขภาพ — ใช้แล้วบนฐานข้อมูลจริง
+-- create table public.webhook_events (...): ดู migration webhook_events_durable
+-- select cron.schedule('tesr-line-reprocess', '* * * * *', $$ ... /functions/v1/line-webhook?reprocess=1 ... $$);
+-- select cron.schedule('tesr-health-check', '*/5 * * * *', $$ ... /functions/v1/health-check ... $$);

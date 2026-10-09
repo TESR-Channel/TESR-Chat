@@ -1,6 +1,6 @@
 // TESR Chat — Service Worker
 // ทำให้ติดตั้งเป็นแอปได้ เปิดเร็วขึ้น และรับแจ้งเตือนข้อความใหม่ (Web Push) แม้ปิดแอปอยู่
-const CACHE = "tesr-chat-v4";
+const CACHE = "tesr-chat-v5";
 const SHELL = ["./", "./index.html", "./config.js", "./icon.svg", "./manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {

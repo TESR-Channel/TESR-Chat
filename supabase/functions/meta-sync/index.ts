@@ -150,6 +150,7 @@ Deno.serve(async (req) => {
     for (const kind of ["facebook", "instagram"] as const) {
       try { out.push(await syncChannel(kind, backfill)); } catch (e) { out.push({ kind, error: String(e) }); }
     }
+    if (!out.some((o: any) => o.error)) await setSecret("meta_sync_last_ok", new Date().toISOString()); // health-check ใช้ดู
   } finally {
     await db.from("app_secrets").update({ value: "1970-01-01T00:00:00.000Z" }).eq("key", "meta_sync_lock");
   }
