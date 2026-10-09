@@ -812,9 +812,18 @@ function renderHead() {
         ${c.business_unit ? " · " + esc(UNITS[c.business_unit]) : ""}
         ${c.assigned_to ? " · ผู้ดูแล: " + esc(S.staff[c.assigned_to]?.display_name || "") : ""}</div>
     </div>
+    ${c.awaiting_since ? `<button class="btn ghost" id="noReplyBtn" title="ลูกค้าแค่ตอบรับ/ขอบคุณ ไม่ต้องตอบกลับ — เอาออกจากรายการรอตอบ (ไม่นับเป็นตอบช้าใน KPI)" style="padding:5px 10px;font-size:13px;white-space:nowrap">✓ ไม่ต้องตอบ</button>` : ""}
     <button class="iconbtn" id="infoBtn" title="ข้อมูลลูกค้า / โน้ต">&#x2139;&#xFE0E;</button>`;
   $("backBtn2").onclick = () => { $("inboxView").classList.remove("chatting"); S.current = null; renderList(); };
   $("infoBtn").onclick = () => $("infoCol").classList.toggle("closed");
+  const nr = $("noReplyBtn");
+  if (nr) nr.onclick = async () => {
+    nr.disabled = true;
+    const { error } = await sb.from("contacts").update({ awaiting_since:null, unread:0 }).eq("id", c.id);
+    if (error) { nr.disabled = false; return toast("ไม่สำเร็จ: " + error.message); }
+    c.awaiting_since = null; c.unread = 0; renderHead(); renderList();
+    toast("เอาออกจากรายการรอตอบแล้ว ✓");
+  };
 }
 
 function mediaHtml(m) {
@@ -840,6 +849,7 @@ function renderMsgs() {
     const sender = m.direction === "in" && m.raw?.tesr_sender ? `<div style="font-size:12px;font-weight:600;color:var(--brand)">${esc(m.raw.tesr_sender)}</div>` : "";
     const body = sender + (m.media_url ? mediaHtml(m) : "") + (showText ? `<div>${linkify(m.text)}</div>` : "");
     let meta = hhmm(m.created_at);
+    if (m.direction === "in" && m.raw?.tesr_ack) meta += ` · <span title="ข้อความตอบรับ/ขอบคุณ ระบบไม่นับเป็นแชตรอตอบ">👍 ตอบรับ</span>`;
     if (m.direction === "out") {
       meta += ` · ${esc(S.staff[m.sent_by]?.display_name || "ระบบ")}`;
       if (m.response_seconds != null)
