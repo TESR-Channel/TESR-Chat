@@ -158,6 +158,11 @@ Deno.serve(async (req) => {
   if (!admin) return json({ ok: false, msg: "เฉพาะแอดมินเท่านั้น" }, 403);
 
   const b = await req.json().catch(() => ({}));
+  // งานจัดการพนักงานคนอื่น = เฉพาะเจ้าของระบบ (owner)
+  if (["list_users", "create_user", "reset_password", "reset_to_phone"].includes(b.action)) {
+    const { data: me } = await db.from("staff").select("is_owner").eq("id", admin.id).maybeSingle();
+    if (!me?.is_owner) return json({ ok: false, msg: "จัดการพนักงานได้เฉพาะเจ้าของระบบ (owner)" }, 403);
+  }
   try {
     switch (b.action) {
       case "test":
@@ -186,7 +191,7 @@ Deno.serve(async (req) => {
         });
         if (error) return json({ ok: false, msg: error.message }, 400);
         await db.from("staff").update({
-          role: role === "admin" ? "admin" : "agent",
+          role: role === "admin" ? "admin" : "agent", // owner ตั้งผ่านฐานข้อมูลเท่านั้น
           position: b.position || null, phone: b.phone || null,
         }).eq("id", data.user.id);
         // เก็บรหัสเริ่มต้นให้แอดมินดูได้ (ถูกลบเมื่อพนักงานเปลี่ยนรหัสเอง)

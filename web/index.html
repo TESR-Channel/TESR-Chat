@@ -372,7 +372,7 @@ header .me{position:relative}
     </div>
     <div class="cards" id="kpis"></div>
     <div>
-      <h3 style="font-size:14px;margin:0 0 8px">รายบุคคล</h3>
+      <h3 style="font-size:14px;margin:0 0 8px" id="staffTblTitle">รายบุคคล</h3>
       <div style="overflow-x:auto"><table id="staffTbl"></table></div>
     </div>
     <div>
@@ -388,7 +388,7 @@ header .me{position:relative}
       <h2 style="margin:0;font-size:20px">ตั้งค่าระบบ</h2>
       <div class="chips" id="setTabs" style="margin-left:auto">
         <button class="chip on" data-t="channels">ช่องทาง</button>
-        <button class="chip" data-t="staff">พนักงาน</button>
+        <button class="chip" data-t="staff" id="setTabStaff" title="เพิ่ม/แก้ไขพนักงาน รีเซ็ตรหัส (เฉพาะเจ้าของระบบ)">พนักงาน</button>
         <button class="chip" data-t="quick">ข้อความลัด</button>
         <button class="chip" data-t="general">ทั่วไป</button>
       </div>
@@ -661,6 +661,10 @@ async function boot(user) {
   }
   S.me = me;
   $("navSettings").classList.toggle("hidden", me.role !== "admin");
+  // เจ้าของระบบ (owner): จัดการพนักงานทุกคน + ดูสถิติ/Export ของทุกคน — คนอื่นจัดการได้เฉพาะตัวเอง
+  $("setTabStaff").classList.toggle("hidden", !me.is_owner);
+  $("exportBtn").classList.toggle("hidden", !me.is_owner);
+  $("staffTblTitle").textContent = me.is_owner ? "รายบุคคล (ทุกคน)" : "สถิติของฉัน";
   const { data: st } = await sb.from("app_settings").select("key,value");
   S.settings = Object.fromEntries((st || []).map(r => [r.key, r.value]));
   if (S.settings.slow_reply_min) SLOW = Number(S.settings.slow_reply_min) * 60;
@@ -1529,6 +1533,7 @@ async function adminApi(body) {
 
 function loadSettings() {
   if (S.me?.role !== "admin") return;
+  if (SET_TAB === "staff" && !S.me.is_owner) SET_TAB = "channels";
   ({ channels:renderChannels, staff:renderStaffAdmin, quick:renderQuickAdmin, general:renderGeneral })[SET_TAB]();
 }
 
@@ -1656,13 +1661,15 @@ async function renderStaffAdmin() {
              <button class="btn ghost" data-pwshow title="แสดง/ซ่อน" style="padding:2px 6px;font-size:13px">👁</button>
              <button class="btn ghost" data-pwcopy title="คัดลอก" style="padding:2px 6px;font-size:13px">📋</button>`
           : `<span style="color:var(--muted)">เปลี่ยนเองแล้ว</span>`}</td>
-        <td><select class="inp" data-f="role" style="padding:5px 8px"><option value="agent"${s.role === "agent" ? " selected" : ""}>พนักงาน</option><option value="admin"${s.role === "admin" ? " selected" : ""}>แอดมิน</option></select></td>
-        <td><input type="checkbox" data-f="active"${s.active ? " checked" : ""} style="width:18px;height:18px;accent-color:var(--brand)"></td>
+        <td>${s.is_owner ? `<span title="เจ้าของระบบ: จัดการได้ทุกอย่าง" style="white-space:nowrap;font-weight:600">👑 เจ้าของระบบ</span>`
+          : `<select class="inp" data-f="role" title="แอดมิน = ตั้งค่าช่องทาง/ข้อความลัดได้ · พนักงาน = ตอบแชตอย่างเดียว" style="padding:5px 8px"><option value="agent"${s.role === "agent" ? " selected" : ""}>พนักงาน</option><option value="admin"${s.role === "admin" ? " selected" : ""}>แอดมิน</option></select>`}</td>
+        <td>${s.is_owner ? "✓" : `<input type="checkbox" data-f="active"${s.active ? " checked" : ""} style="width:18px;height:18px;accent-color:var(--brand)">`}</td>
         <td style="font-size:13px;color:var(--muted)">${emails[s.id]?.last_sign_in_at ? dayLabel(emails[s.id].last_sign_in_at) : "–"}</td>
         <td><button class="btn ghost" data-pw title="ตั้งรหัสผ่านใหม่ให้พนักงานคนนี้ (ค่าเริ่มต้นคือเบอร์โทร) ใช้ตอนพนักงานลืมรหัส" style="padding:4px 10px;font-size:13px;white-space:nowrap">🔑 รีเซ็ตรหัส</button></td>
       </tr>`).join("")}
     </table></div>
-    <div class="hint" style="margin-top:8px">แก้ชื่อ ตำแหน่ง เบอร์โทร หรือสิทธิ์ในตารางได้เลย ระบบบันทึกให้ทันที · พนักงานเปลี่ยนรหัสของตัวเองได้ที่เมนู <b>👤 ชื่อตัวเอง ▾ › เปลี่ยนรหัสผ่าน</b> มุมขวาบน · ปุ่ม <b>🔑 รีเซ็ตรหัส</b> ใช้ตอนพนักงานลืมรหัส</div>`;
+    <div class="hint" style="margin-top:8px">แก้ชื่อ ตำแหน่ง เบอร์โทร หรือสิทธิ์ในตารางได้เลย ระบบบันทึกให้ทันที · พนักงานเปลี่ยนรหัสของตัวเองได้ที่เมนู <b>👤 ชื่อตัวเอง ▾ › เปลี่ยนรหัสผ่าน</b> มุมขวาบน · ปุ่ม <b>🔑 รีเซ็ตรหัส</b> ใช้ตอนพนักงานลืมรหัส<br>
+      สิทธิ์: <b>👑 เจ้าของระบบ</b> จัดการได้ทุกอย่างและเห็นสถิติทุกคน · <b>แอดมิน</b> ตั้งค่าช่องทาง/ข้อความลัด/ทั่วไปได้ แต่จัดการได้เฉพาะบัญชีตัวเอง · <b>พนักงาน</b> ตอบแชต จัดการได้เฉพาะบัญชีตัวเอง</div>`;
 
   $("nuAdd").onclick = async () => {
     const r = await adminApi({ action:"create_user", name:$("nuName").value.trim(), email:$("nuEmail").value.trim(),
