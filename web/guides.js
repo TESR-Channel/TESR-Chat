@@ -98,6 +98,7 @@
         { ph: "meta", title: "เพิ่มสิทธิ์ให้แอป (ทำก่อน Generate token)",
           where: ["Use cases", "Messenger from Meta", "Customize", "Permissions and features"],
           do: ["กด <b>+ Add</b> ทุกตัวนี้: <code>pages_messaging</code> <code>pages_manage_metadata</code> <code>pages_read_engagement</code> <code>pages_show_list</code> <code>instagram_basic</code> <code>instagram_manage_messages</code>",
+               "เพิ่ม <b>Business Asset User Profile Access</b> (ให้เห็นรูปโปรไฟล์ลูกค้า)",
                "แนะนำเพิ่ม <b>Human Agent</b> (ตอบลูกค้าได้ถึง 7 วัน แทน 24 ชม.)"],
           ok: "ทุกตัวขึ้น \"Ready for testing\"",
           tip: "ถ้าเพิ่มสิทธิ์ทีหลัง ต้อง Generate token ใหม่ทุกครั้ง ไม่งั้น token จะได้สิทธิ์ไม่ครบ (IG จะเชื่อมไม่ได้)" },
