@@ -104,7 +104,7 @@ async function syncChannel(kind: "facebook" | "instagram", backfill = false) {
         if (url) media = (await storeFromUrl(url, kind, {}, att.name)) ?? url;
         if (type === "file") { fileName = att.name ?? "ไฟล์แนบ"; text = text ?? fileName; }
       }
-      if (!text && !media) text = "[ข้อความที่ระบบยังไม่รองรับ]";
+      if (!text && !media) continue; // ว่างเปล่า (เช่นกดหัวใจ/รีแอคชัน/ข้อความที่ถูกยกเลิก) ไม่ต้องบันทึก
       if (self) { // เพจตอบจากที่อื่น (Business Suite ฯลฯ) → บันทึกเป็นข้อความขาออก
         const { error } = await db.rpc("ingest_page_reply", {
           p_channel: kind, p_uid: uid, p_type: type, p_text: text, p_media: media, p_file_name: fileName,
