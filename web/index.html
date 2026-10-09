@@ -175,7 +175,9 @@ header .me{margin-left:auto;display:flex;gap:10px;align-items:center;color:var(-
 .msg.sending{opacity:.6}
 
 /* dashboard */
-.dash{overflow-y:auto;padding:20px;display:grid;gap:18px;align-content:start;max-width:1100px;width:100%;margin:0 auto}
+.dash{overflow-y:auto;padding:24px clamp(16px,3vw,40px);display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-content:start;max-width:1440px;width:100%;margin:0 auto}
+.dash > *{min-width:0}
+#setTabs{flex-wrap:wrap;overflow:visible}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
 .card .k{font-size:12px;color:var(--muted)}
@@ -197,7 +199,26 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .copybox code{background:var(--bg);padding:1px 6px;border-radius:5px;font-size:13px;word-break:break-all}
 .copybox{display:flex;gap:8px;align-items:center;background:var(--bg);border-radius:10px;padding:8px 10px;font-size:13px}
 .copybox code{flex:1;background:none;padding:0}
-.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.tblwrap{overflow-x:auto;border-radius:12px}
+.dash-2col{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px;align-items:start}
+@media (max-width:1100px){.dash-2col{grid-template-columns:minmax(0,1fr)}}
+.stafftbl td{vertical-align:middle}
+.stafftbl .inp{padding:6px 9px;width:100%;min-width:0}
+.stafftbl td.c-name{min-width:150px}
+.stafftbl td.c-mail{font-size:13px;white-space:nowrap}
+.stafftbl td:nth-child(2){min-width:110px} .stafftbl td:nth-child(3){min-width:120px}
+/* แท็บเล็ต/มือถือ: ตารางพนักงานเปลี่ยนเป็นการ์ดรายคน */
+@media (max-width:1100px){
+  .stafftbl,.stafftbl tbody{display:block;background:none;border:0}
+  .stafftbl tr:first-child{display:none}
+  .stafftbl tr{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+  .stafftbl td{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;border:0;padding:0;min-width:0!important;align-content:flex-start}
+  .stafftbl td::before{content:attr(data-l);flex-basis:100%;font-size:12px;color:var(--muted);font-weight:600}
+  .stafftbl td.c-mail{white-space:normal;overflow-wrap:anywhere;grid-column:span 2}
+  .stafftbl td.c-name{grid-column:1/-1}
+  .stafftbl td.c-name .inp{font-size:16px;font-weight:600}
+}
 .fgrid .field input{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);width:100%}
 .hint{font-size:12px;color:var(--muted)}
 .switch{display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer}
@@ -371,13 +392,15 @@ header .me{position:relative}
       <div class="chips" id="rangeChips" style="margin-left:auto"></div>
     </div>
     <div class="cards" id="kpis"></div>
-    <div>
-      <h3 style="font-size:14px;margin:0 0 8px" id="staffTblTitle">รายบุคคล</h3>
-      <div style="overflow-x:auto"><table id="staffTbl"></table></div>
-    </div>
-    <div>
-      <h3 style="font-size:14px;margin:0 0 8px">แยกตามช่องทาง</h3>
-      <div style="overflow-x:auto"><table id="chanTbl"></table></div>
+    <div class="dash-2col">
+      <div>
+        <h3 style="font-size:14px;margin:0 0 8px" id="staffTblTitle">รายบุคคล</h3>
+        <div class="tblwrap"><table id="staffTbl"></table></div>
+      </div>
+      <div>
+        <h3 style="font-size:14px;margin:0 0 8px">แยกตามช่องทาง</h3>
+        <div class="tblwrap"><table id="chanTbl"></table></div>
+      </div>
     </div>
     <div><button class="btn ghost" id="exportBtn">⬇ Export แชตช่วงนี้เป็น CSV</button></div>
   </main>
@@ -1649,23 +1672,23 @@ async function renderStaffAdmin() {
         <button class="btn ghost" id="pwPhoneAll" title="เฉพาะคนที่ยังไม่เคยเปลี่ยนรหัสเอง">📱 ตั้งรหัสเริ่มต้นเป็นเบอร์โทร (ทุกคนที่ยังไม่เปลี่ยนรหัส)</button></div>
       <div class="hint">รหัสเริ่มต้นคือ<b>เบอร์โทรของพนักงาน (ตัวเลขล้วน เช่น 0812345678)</b> ถ้าไม่ได้กรอกรหัสเอง · ส่งอีเมลและรหัสผ่านให้พนักงานเอง ระบบไม่ส่งอีเมลให้ · ช่อง "รหัสเริ่มต้น" แอดมินดูได้จนกว่าพนักงานจะกด 🔑 เปลี่ยนรหัสเอง (จากนั้นจะหายไปเพื่อความปลอดภัย)</div>
     </div>
-    <div style="overflow-x:auto;margin-top:14px"><table>
+    <div class="tblwrap" style="margin-top:14px"><table class="stafftbl">
       <tr><th>ชื่อ</th><th>ตำแหน่ง</th><th>เบอร์โทร</th><th>อีเมล</th><th title="แอดมินเห็นได้จนกว่าพนักงานจะเปลี่ยนรหัสเอง">รหัสเริ่มต้น</th><th>สิทธิ์</th><th title="เอาติ๊กออก = ปิดบัญชี ล็อกอินไม่ได้">ใช้งาน</th><th>เข้าใช้ล่าสุด</th><th>ลืมรหัส</th></tr>
       ${(staff || []).map(s => `<tr data-id="${s.id}">
-        <td><input class="inp" data-f="display_name" value="${esc(s.display_name)}" style="padding:5px 8px;min-width:140px"></td>
-        <td><input class="inp" data-f="position" value="${esc(s.position || "")}" style="padding:5px 8px;min-width:100px"></td>
-        <td><input class="inp" data-f="phone" type="tel" value="${esc(s.phone || "")}" style="padding:5px 8px;min-width:110px"></td>
-        <td style="font-size:13px">${esc(emails[s.id]?.email || "")}</td>
-        <td style="white-space:nowrap;font-size:13px">${initPw[s.id]
+        <td data-l="ชื่อ" class="c-name"><input class="inp" data-f="display_name" value="${esc(s.display_name)}"></td>
+        <td data-l="ตำแหน่ง"><input class="inp" data-f="position" value="${esc(s.position || "")}"></td>
+        <td data-l="เบอร์โทร"><input class="inp" data-f="phone" type="tel" value="${esc(s.phone || "")}"></td>
+        <td data-l="อีเมล" class="c-mail">${esc(emails[s.id]?.email || "")}</td>
+        <td data-l="รหัสเริ่มต้น" style="white-space:nowrap;font-size:13px">${initPw[s.id]
           ? `<code data-pwv="${esc(initPw[s.id])}" style="font-family:ui-monospace,monospace">••••••••</code>
              <button class="btn ghost" data-pwshow title="แสดง/ซ่อน" style="padding:2px 6px;font-size:13px">👁</button>
              <button class="btn ghost" data-pwcopy title="คัดลอก" style="padding:2px 6px;font-size:13px">📋</button>`
           : `<span style="color:var(--muted)">เปลี่ยนเองแล้ว</span>`}</td>
-        <td>${s.is_owner ? `<span title="เจ้าของระบบ: จัดการได้ทุกอย่าง" style="white-space:nowrap;font-weight:600">👑 เจ้าของระบบ</span>`
+        <td data-l="สิทธิ์">${s.is_owner ? `<span title="เจ้าของระบบ: จัดการได้ทุกอย่าง" style="white-space:nowrap;font-weight:600">👑 เจ้าของระบบ</span>`
           : `<select class="inp" data-f="role" title="แอดมิน = ตั้งค่าช่องทาง/ข้อความลัดได้ · พนักงาน = ตอบแชตอย่างเดียว" style="padding:5px 8px"><option value="agent"${s.role === "agent" ? " selected" : ""}>พนักงาน</option><option value="admin"${s.role === "admin" ? " selected" : ""}>แอดมิน</option></select>`}</td>
-        <td>${s.is_owner ? "✓" : `<input type="checkbox" data-f="active"${s.active ? " checked" : ""} style="width:18px;height:18px;accent-color:var(--brand)">`}</td>
-        <td style="font-size:13px;color:var(--muted)">${emails[s.id]?.last_sign_in_at ? dayLabel(emails[s.id].last_sign_in_at) : "–"}</td>
-        <td><button class="btn ghost" data-pw title="ตั้งรหัสผ่านใหม่ให้พนักงานคนนี้ (ค่าเริ่มต้นคือเบอร์โทร) ใช้ตอนพนักงานลืมรหัส" style="padding:4px 10px;font-size:13px;white-space:nowrap">🔑 รีเซ็ตรหัส</button></td>
+        <td data-l="ใช้งาน">${s.is_owner ? "✓" : `<input type="checkbox" data-f="active"${s.active ? " checked" : ""} style="width:18px;height:18px;accent-color:var(--brand)">`}</td>
+        <td data-l="เข้าใช้ล่าสุด" style="font-size:13px;color:var(--muted)">${emails[s.id]?.last_sign_in_at ? dayLabel(emails[s.id].last_sign_in_at) : "–"}</td>
+        <td data-l="ลืมรหัส"><button class="btn ghost" data-pw title="ตั้งรหัสผ่านใหม่ให้พนักงานคนนี้ (ค่าเริ่มต้นคือเบอร์โทร) ใช้ตอนพนักงานลืมรหัส" style="padding:4px 10px;font-size:13px;white-space:nowrap">🔑 รีเซ็ตรหัส</button></td>
       </tr>`).join("")}
     </table></div>
     <div class="hint" style="margin-top:8px">แก้ชื่อ ตำแหน่ง เบอร์โทร หรือสิทธิ์ในตารางได้เลย ระบบบันทึกให้ทันที · พนักงานเปลี่ยนรหัสของตัวเองได้ที่เมนู <b>👤 ชื่อตัวเอง ▾ › เปลี่ยนรหัสผ่าน</b> มุมขวาบน · ปุ่ม <b>🔑 รีเซ็ตรหัส</b> ใช้ตอนพนักงานลืมรหัส<br>
